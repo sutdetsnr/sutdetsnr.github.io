@@ -38,7 +38,7 @@ async function loadAlbums(username) {
     });
 }
 
-async function loadAlbum(imgFolder, albumName) {
+async function loadAlbum(Username, albumName) {
     const response = await fetch(`https://api.github.com/repos/${githubUser}/${repo}/contents/${imgFolder}/${albumName}`);
     const images = await response.json();
 

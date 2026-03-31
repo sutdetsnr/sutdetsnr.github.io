@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔬 QR Camera Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --navy:#1a3a5c; --gold:#c9a227; --green:#4CAF50; --red:#e53935; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Sarabun',sans-serif; background:#f0f2f5; padding:16px; }
+
+    h1 { text-align:center; color:var(--navy); font-size:20px; margin-bottom:4px; }
+    .subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:20px; }
+
+    .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,.08); max-width:420px; margin:0 auto 16px; }
+    .card-title { font-size:15px; font-weight:700; color:var(--navy); border-bottom:2px solid var(--gold); padding-bottom:8px; margin-bottom:16px; }
+
+    /* ── Environment Check ── */
+    .check-list { list-style:none; }
+    .check-list li { padding:8px 0; font-size:14px; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center; }
+    .check-list li:last-child { border-bottom:none; }
+    .badge { padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+    .badge.ok   { background:#e8f5e9; color:#2e7d32; }
+    .badge.fail { background:#ffebee; color:#c62828; }
+    .badge.warn { background:#fff8e1; color:#f57f17; }
+    .badge.checking { background:#e3f2fd; color:#1565c0; }
+
+    /* ── Scanner ── */
+    #reader { width:100%; border-radius:8px; overflow:hidden; margin-bottom:12px; min-height:60px; }
+
+    .btn-row { display:flex; gap:8px; margin-bottom:12px; }
+    .btn { flex:1; padding:11px; border:none; border-radius:8px; font-size:14px;
+           font-family:'Sarabun',sans-serif; font-weight:700; cursor:pointer; }
+    .btn-start  { background:var(--navy); color:#fff; }
+    .btn-stop   { background:#607d8b; color:#fff; }
+    .btn-switch { background:var(--gold); color:#fff; }
+    .btn:disabled { opacity:0.45; cursor:not-allowed; }
+
+    .status-box { padding:10px 14px; border-radius:8px; font-size:14px; margin-bottom:12px; }
+    .info    { background:#e3f2fd; color:#1565c0; }
+    .success { background:#e8f5e9; color:#2e7d32; }
+    .error   { background:#ffebee; color:#c62828; }
+
+    /* ── Result ── */
+    .result-box { background:#f8f9fb; border-left:4px solid var(--gold); padding:12px 14px; border-radius:0 8px 8px 0; font-size:14px; word-break:break-all; }
+    .result-box .label { color:#888; font-size:12px; margin-bottom:4px; }
+    .result-box .value { font-weight:700; color:var(--navy); font-size:16px; }
+    .result-box .count { color:#888; font-size:12px; margin-top:6px; }
+
+    /* ── Log ── */
+    #logBox { background:#1e1e1e; color:#a5d6a7; font-family:monospace; font-size:12px;
+              padding:12px; border-radius:8px; max-height:160px; overflow-y:auto; line-height:1.7; }
+    .log-ts  { color:#546e7a; }
+    .log-ok  { color:#a5d6a7; }
+    .log-err { color:#ef9a9a; }
+    .log-inf { color:#90caf9; }
+  </style>
+</head>
+<body>
+
+<h1>🔬 QR Camera Test</h1>
+<p class="subtitle">ทดสอบว่ากล้อง + QR ทำงานได้จริงนอก GAS iframe</p>
+
+<!-- ① Environment Check -->
+<div class="card">
+  <div class="card-title">① Environment Check</div>
+  <ul class="check-list" id="checkList">
+    <li>HTTPS / localhost <span id="chkHttps" class="badge checking">ตรวจสอบ...</span></li>
+    <li>mediaDevices API   <span id="chkMedia" class="badge checking">ตรวจสอบ...</span></li>
+    <li>getUserMedia       <span id="chkGUM"   class="badge checking">ตรวจสอบ...</span></li>
+    <li>Permissions Policy <span id="chkPerm"  class="badge checking">ตรวจสอบ...</span></li>
+    <li>html5-qrcode lib   <span id="chkLib"   class="badge checking">ตรวจสอบ...</span></li>
+    <li>iframe depth       <span id="chkIframe" class="badge checking">ตรวจสอบ...</span></li>
+  </ul>
+</div>
+
+<!-- ② Scanner -->
+<div class="card">
+  <div class="card-title">② QR Scanner</div>
+  <div id="reader"></div>
+  <div id="statusBox" class="status-box info">กด "เริ่มสแกน" เพื่อเปิดกล้อง</div>
+  <div class="btn-row">
+    <button class="btn btn-start"  id="btnStart" >▶ เริ่มสแกน</button>
+    <button class="btn btn-stop"   id="btnStop"  disabled>■ หยุด</button>
+    <button class="btn btn-switch" id="btnSwitch" disabled>⇄ สลับกล้อง</button>
+  </div>
+</div>
+
+<!-- ③ Result -->
+<div class="card">
+  <div class="card-title">③ ผลการสแกน</div>
+  <div class="result-box">
+    <div class="label">QR Code ที่อ่านได้ล่าสุด</div>
+    <div class="value" id="resultValue">— ยังไม่มีผล —</div>
+    <div class="count" id="resultCount">สแกนสำเร็จ: 0 ครั้ง</div>
+  </div>
+</div>
+
+<!-- ④ Log -->
+<div class="card">
+  <div class="card-title">④ Console Log</div>
+  <div id="logBox"></div>
+</div>
+
+<script>
+// ── Logger ──
+var scanCount = 0;
+function log(msg, type) {
+  var box = document.getElementById('logBox');
+  var ts  = new Date().toLocaleTimeString('th-TH');
+  var cls = type === 'ok' ? 'log-ok' : type === 'err' ? 'log-err' : 'log-inf';
+  box.innerHTML += '<div><span class="log-ts">[' + ts + ']</span> <span class="' + cls + '">' + msg + '</span></div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+function setBadge(id, text, type) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'badge ' + type;
+}
+
+function setStatus(msg, type) {
+  var el = document.getElementById('statusBox');
+  el.textContent = msg;
+  el.className = 'status-box ' + type;
+}
+
+// ── ① Environment Check ──
+function runChecks() {
+  // HTTPS / localhost
+  var isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:';
+  setBadge('chkHttps', isSecure ? '✅ ' + location.protocol : '❌ ' + location.protocol, isSecure ? 'ok' : 'fail');
+  log('Protocol: ' + location.protocol + ' | Host: ' + (location.hostname || 'file'), isSecure ? 'ok' : 'err');
+
+  // mediaDevices
+  var hasMedia = !!(navigator.mediaDevices);
+  setBadge('chkMedia', hasMedia ? '✅ พร้อมใช้' : '❌ ไม่มี', hasMedia ? 'ok' : 'fail');
+  log('navigator.mediaDevices: ' + (hasMedia ? 'YES' : 'NO'), hasMedia ? 'ok' : 'err');
+
+  // getUserMedia
+  var hasGUM = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  setBadge('chkGUM', hasGUM ? '✅ พร้อมใช้' : '❌ ไม่มี', hasGUM ? 'ok' : 'fail');
+  log('getUserMedia: ' + (hasGUM ? 'YES' : 'NO'), hasGUM ? 'ok' : 'err');
+
+  // Permissions Policy — ทดสอบโดย query permissions API
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'camera' }).then(function(result) {
+      var stateMap = { granted: '✅ granted', denied: '❌ denied', prompt: '⚠️ prompt (ยังไม่ได้อนุญาต)' };
+      var badgeMap = { granted: 'ok', denied: 'fail', prompt: 'warn' };
+      setBadge('chkPerm', stateMap[result.state] || result.state, badgeMap[result.state] || 'warn');
+      log('Camera permission: ' + result.state, result.state === 'granted' ? 'ok' : result.state === 'denied' ? 'err' : 'inf');
+    }).catch(function(e) {
+      setBadge('chkPerm', '⚠️ query ไม่ได้', 'warn');
+      log('permissions.query error: ' + e.message, 'inf');
+    });
+  } else {
+    setBadge('chkPerm', '⚠️ ไม่รองรับ', 'warn');
+    log('permissions API not supported', 'inf');
+  }
+
+  // html5-qrcode
+  var hasLib = typeof Html5Qrcode !== 'undefined';
+  setBadge('chkLib', hasLib ? '✅ โหลดแล้ว' : '❌ ไม่โหลด', hasLib ? 'ok' : 'fail');
+  log('Html5Qrcode lib: ' + (hasLib ? 'loaded' : 'NOT loaded'), hasLib ? 'ok' : 'err');
+
+  // iframe depth
+  var depth = 0;
+  var w = window;
+  try { while (w !== w.parent) { w = w.parent; depth++; if (depth > 5) break; } } catch(e) { depth = '≥1 (cross-origin)'; }
+  var isSafe = depth === 0;
+  setBadge('chkIframe', depth === 0 ? '✅ top-level' : '⚠️ depth: ' + depth, isSafe ? 'ok' : 'warn');
+  log('iframe depth: ' + depth, isSafe ? 'ok' : 'inf');
+}
+
+// ── ② Scanner ──
+var qr         = null;
+var scanning   = false;
+var cameras    = [];
+var camIndex   = 0;
+
+document.getElementById('btnStart').addEventListener('click', function() { startScanner(); });
+document.getElementById('btnStop').addEventListener('click', function() { stopScanner(); });
+document.getElementById('btnSwitch').addEventListener('click', function() { switchCamera(); });
+
+function startScanner() {
+  if (!qr) qr = new Html5Qrcode('reader');
+
+  log('กำลังเปิดกล้อง (facingMode: environment)...', 'inf');
+  setStatus('กำลังเปิดกล้อง...', 'info');
+
+  // ลอง exact environment ก่อน → fallback environment → fallback user
+  tryStart({ facingMode: { exact: 'environment' } })
+    .catch(function() {
+      log('exact environment ไม่ได้ → ลอง environment ธรรมดา', 'inf');
+      return tryStart({ facingMode: 'environment' });
+    })
+    .catch(function() {
+      log('environment ไม่ได้ → ลอง getCameras()', 'inf');
+      return Html5Qrcode.getCameras().then(function(list) {
+        cameras = list;
+        log('พบกล้อง ' + list.length + ' ตัว', 'ok');
+        if (list.length === 0) throw new Error('ไม่พบกล้อง');
+        return tryStart(list[list.length - 1].id); // ใช้กล้องสุดท้าย (มักเป็นหลัง)
+      });
+    })
+    .catch(function(err) {
+      handleCamError(err);
+    });
+}
+
+function tryStart(camConfig) {
+  return qr.start(
+    camConfig,
+    { fps:15, qrbox:{ width:220, height:220 }, aspectRatio:4/3 },
+    onScanSuccess,
+    function() {}
+  ).then(function() {
+    scanning = true;
+    document.getElementById('btnStart').disabled  = true;
+    document.getElementById('btnStop').disabled   = false;
+    document.getElementById('btnSwitch').disabled = false;
+    setStatus('กำลังสแกน... ✅', 'success');
+    log('กล้องเปิดสำเร็จ ✅', 'ok');
+  });
+}
+
+function stopScanner() {
+  if (qr && scanning) {
+    qr.stop().then(function() {
+      scanning = false;
+      document.getElementById('btnStart').disabled  = false;
+      document.getElementById('btnStop').disabled   = true;
+      document.getElementById('btnSwitch').disabled = true;
+      setStatus('หยุดสแกนแล้ว', 'info');
+      log('หยุดกล้อง', 'inf');
+    });
+  }
+}
+
+function switchCamera() {
+  if (cameras.length < 2) {
+    log('มีกล้องเดียว ไม่สามารถสลับได้', 'inf');
+    return;
+  }
+  camIndex = (camIndex + 1) % cameras.length;
+  log('สลับไปกล้อง: ' + cameras[camIndex].label, 'inf');
+  stopScanner();
+  qr = null;
+  setTimeout(function() {
+    qr = new Html5Qrcode('reader');
+    tryStart(cameras[camIndex].id).catch(handleCamError);
+  }, 400);
+}
+
+function handleCamError(err) {
+  var msg = 'ไม่สามารถเปิดกล้องได้';
+  var s   = String(err);
+  if (s.indexOf('NotAllowed')  !== -1) msg = '❌ Permission denied — กรุณาอนุญาตกล้องในเบราว์เซอร์';
+  if (s.indexOf('NotFound')    !== -1) msg = '❌ ไม่พบกล้อง';
+  if (s.indexOf('NotReadable') !== -1) msg = '❌ กล้องถูกใช้งานอยู่';
+  if (s.indexOf('Permissions') !== -1) msg = '❌ Permissions Policy บล็อกกล้อง (อาจอยู่ใน iframe)';
+  setStatus(msg, 'error');
+  log('Camera error: ' + s, 'err');
+  scanning = false;
+  document.getElementById('btnStart').disabled  = false;
+  document.getElementById('btnStop').disabled   = true;
+}
+
+function onScanSuccess(code) {
+  scanCount++;
+  document.getElementById('resultValue').textContent = code;
+  document.getElementById('resultCount').textContent = 'สแกนสำเร็จ: ' + scanCount + ' ครั้ง';
+  log('✅ QR: ' + code, 'ok');
+  setStatus('สแกนสำเร็จ: ' + code, 'success');
+}
+
+// ── Run on Load ──
+window.addEventListener('load', function() {
+  runChecks();
+  log('หน้าโหลดเสร็จ พร้อมทดสอบ', 'inf');
+});
+</script>
+</body>
+</html>

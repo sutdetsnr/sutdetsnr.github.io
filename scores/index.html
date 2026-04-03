@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>สหกรณ์โรงเรียน - แคชเชียร์</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --navy:#1a3a5c; --gold:#c9a227; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Sarabun',sans-serif; background:#f0f2f5; }
+
+    .header { background:var(--navy); padding:16px; text-align:center; }
+    .header h1 { color:var(--gold); font-size:20px; }
+    .header p  { color:#aaa; font-size:13px; margin-top:4px; }
+
+    .container { max-width:460px; margin:20px auto; padding:0 16px; }
+
+    .card { background:#fff; border-radius:12px; padding:24px;
+            box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:16px; }
+    .card-title { font-size:17px; font-weight:700; color:var(--navy);
+                  border-bottom:2px solid var(--gold); padding-bottom:10px; margin-bottom:20px; }
+
+    .form-group { margin-bottom:16px; }
+    label { display:block; font-size:14px; color:#555; margin-bottom:6px; }
+    input[type="text"],
+    input[type="password"],
+    input[type="number"] {
+      width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;
+      font-size:16px; font-family:'Sarabun',sans-serif;
+    }
+    input:focus { outline:none; border-color:var(--navy); }
+
+    .btn { width:100%; padding:13px; border:none; border-radius:8px;
+           font-size:16px; font-family:'Sarabun',sans-serif;
+           font-weight:700; cursor:pointer; margin-bottom:6px; }
+    .btn-primary { background:var(--navy); color:#fff; }
+    .btn-green   { background:#4CAF50; color:#fff; }
+    .btn-gray    { background:#607d8b; color:#fff; }
+    .btn-gold    { background:var(--gold); color:#fff; }
+    .btn:active   { opacity:.85; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+    /* Camera Controls */
+    .cam-row { display:flex; gap:8px; margin:10px 0; }
+    .cam-row .btn { margin-bottom:0; font-size:14px; padding:10px; }
+
+    /* Reader */
+    #reader { width:100%; border-radius:8px; overflow:hidden; margin-bottom:10px; }
+
+    /* Status */
+    .status-box { padding:10px 14px; border-radius:8px; font-size:14px; margin-bottom:12px; }
+    .info    { background:#e3f2fd; color:#1565c0; }
+    .success { background:#e8f5e9; color:#2e7d32; }
+    .error   { background:#ffebee; color:#c62828; }
+
+    /* Manual input */
+    .divider { text-align:center; color:#aaa; font-size:13px; margin:12px 0; position:relative; }
+    .divider::before, .divider::after {
+      content:''; position:absolute; top:50%; width:42%; height:1px; background:#eee;
+    }
+    .divider::before { left:0; } .divider::after { right:0; }
+
+    /* Cashier bar */
+    .cashier-bar { background:var(--navy); color:#fff; padding:10px 16px;
+                   border-radius:8px; margin-bottom:16px; font-size:14px;
+                   display:flex; justify-content:space-between; align-items:center; }
+    .cashier-bar span { color:var(--gold); font-weight:700; }
+    .cashier-bar a { color:#aaa; font-size:12px; cursor:pointer; }
+
+    /* Loading */
+    .save-wrap { position:relative; }
+    .loading-indicator { display:none; align-items:center; justify-content:center;
+                         gap:8px; padding:13px; }
+    .spinner { width:20px; height:20px; border:3px solid #f3f3f3;
+               border-top:3px solid #4CAF50; border-radius:50%;
+               animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Recent */
+    .recent-item { background:#f8f9fb; border-left:4px solid var(--gold);
+                   padding:10px 12px; margin-bottom:8px; border-radius:0 8px 8px 0; font-size:13px; }
+    .recent-item .pts { font-weight:700; color:var(--navy); margin-top:3px; }
+    .empty-msg { color:#bbb; font-size:13px; text-align:center; padding:10px 0; }
+
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏪 ร้านค้าสหกรณ์โรงเรียน</h1>
+  <p>ระบบบันทึกแต้มสะสม</p>
+</div>
+
+<!-- LOGIN -->
+<div class="container" id="loginSection">
+  <div class="card" style="margin-top:32px;">
+    <div class="card-title">🔐 เข้าสู่ระบบแคชเชียร์</div>
+    <div class="form-group">
+      <label>รหัสผู้ใช้</label>
+      <input type="text" id="loginId" placeholder="กรอกรหัสผู้ใช้" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>รหัสผ่าน</label>
+      <input type="password" id="loginPass" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btnLogin">เข้าสู่ระบบ</button>
+  </div>
+</div>
+
+<!-- CASHIER -->
+<div class="container hidden" id="cashierSection">
+  <div class="cashier-bar">
+    <div>แคชเชียร์: <span id="cashierName"></span></div>
+    <a id="btnLogout">ออกจากระบบ</a>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📲 บันทึกแต้มสะสม</div>
+
+    <!-- QR Reader -->
+    <div id="reader"></div>
+    <div id="statusBox" class="status-box info">กด "เริ่มสแกน" เพื่อเปิดกล้อง</div>
+
+    <!-- Camera buttons -->
+    <div class="cam-row">
+      <button class="btn btn-primary" id="btnStart" >▶ เริ่มสแกน</button>
+      <button class="btn btn-gray"    id="btnStop"   disabled>■ หยุด</button>
+      <button class="btn btn-gold"    id="btnSwitch" disabled>⇄ สลับกล้อง</button>
+    </div>
+
+    <!-- QR result (hidden input เก็บค่า) -->
+    <input type="hidden" id="scannedId">
+
+    <!-- Manual -->
+    <div class="divider">หรือกรอกเองด้านล่าง</div>
+    <div class="form-group">
+      <label>รหัสนักเรียน (กรอกเอง)</label>
+      <input type="text" id="studentIdManual" placeholder="กรอกรหัสนักเรียน" autocomplete="off">
+    </div>
+
+    <!-- Points -->
+    <div class="form-group">
+      <label>แต้มที่ได้รับ (= ยอดเงินที่ซื้อ)</label>
+      <input type="number" id="points" placeholder="เช่น 20" min="1">
+    </div>
+
+    <!-- Save -->
+    <div class="save-wrap">
+      <button class="btn btn-green" id="saveButton" disabled>✅ บันทึกแต้ม</button>
+      <div id="saveLoading" class="loading-indicator">
+        <div class="spinner"></div><span>กำลังบันทึก...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent -->
+  <div class="card">
+    <div class="card-title">📋 รายการล่าสุด (เซสชันนี้)</div>
+    <div id="recentList"><p class="empty-msg">ยังไม่มีรายการ</p></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  ⚙️  CONFIG — เปลี่ยนแค่บรรทัดนี้บรรทัดเดียว
+// ══════════════════════════════════════════
+var GAS_URL = 'https://script.google.com/a/macros/snr.ac.th/s/AKfycbxdEDIdw5vTK8F0Q0OhG6WxW8omu_AQ1TS7CPp_KL6fWMlATnmc2rTxmUpcAZlz0KU8/exec';
+// ══════════════════════════════════════════
+
+var currentCashierId   = '';
+var currentCashierName = '';
+var recentList         = [];
+var qr                 = null;
+var scanning           = false;
+var isSweetAlertOpen   = false;
+var cameras            = [];
+var camIndex           = 0;
+
+// ── API Helper ──
+// ใช้ POST + body เป็น plain string → ไม่มี CORS preflight
+function callAPI(action, params) {
+  var payload = Object.assign({ action: action }, params || {});
+  return fetch(GAS_URL, {
+    method: 'POST',
+    body:   JSON.stringify(payload)
+    // ❌ ห้ามใส่ Content-Type: application/json → จะทำให้มี preflight
+    // ✅ ไม่ใส่ → browser ส่งเป็น text/plain อัตโนมัติ → simple request
+  })
+  .then(function(res) { return res.json(); });
+}
+
+// ── Toggle Save Button ──
+function toggleSave(showBtn) {
+  var btn  = document.getElementById('saveButton');
+  var load = document.getElementById('saveLoading');
+  btn.style.display  = showBtn ? 'block' : 'none';
+  btn.disabled       = !showBtn;
+  load.style.display = showBtn ? 'none' : 'flex';
+}
+
+function setStatus(msg, type) {
+  var el = document.getElementById('statusBox');
+  el.textContent = msg;
+  el.className   = 'status-box ' + type;
+}
+
+// ── QR Scanner ──
+var QRScanner = {
+
+  start: function() {
+    if (!qr) qr = new Html5Qrcode('reader');
+    setStatus('กำลังเปิดกล้อง...', 'info');
+
+    // ลอง exact environment → environment → getCameras
+    this._tryStart({ facingMode: { exact: 'environment' } })
+      .catch(function() {
+        return QRScanner._tryStart({ facingMode: 'environment' });
+      })
+      .catch(function() {
+        return Html5Qrcode.getCameras().then(function(list) {
+          cameras  = list;
+          camIndex = list.length - 1; // กล้องหลังมักอยู่ท้ายสุด
+          if (!list.length) throw new Error('ไม่พบกล้อง');
+          return QRScanner._tryStart(list[camIndex].id);
+        });
+      })
+      .catch(function(err) { QRScanner._handleError(err); });
+  },
+
+  _tryStart: function(camConfig) {
+    return qr.start(
+      camConfig,
+      { fps:15, qrbox:{ width:220, height:220 }, aspectRatio:4/3 },
+      QRScanner.onSuccess,
+      function() {}
+    ).then(function() {
+      scanning = true;
+      document.getElementById('btnStart').disabled  = true;
+      document.getElementById('btnStop').disabled   = false;
+      document.getElementById('btnSwitch').disabled = false;
+      setStatus('กำลังสแกน...', 'info');
+    });
+  },
+
+  stop: function() {
+    if (qr && scanning) {
+      return qr.stop().then(function() {
+        scanning = false;
+        document.getElementById('btnStart').disabled  = false;
+        document.getElementById('btnStop').disabled   = true;
+        document.getElementById('btnSwitch').disabled = true;
+        setStatus('หยุดสแกน', 'info');
+      });
+    }
+    return Promise.resolve();
+  },
+
+  switchCam: function() {
+    if (cameras.length < 2) { setStatus('มีกล้องเดียว ไม่สามารถสลับได้', 'error'); return; }
+    camIndex = (camIndex + 1) % cameras.length;
+    QRScanner.stop().then(function() {
+      qr = null;
+      setTimeout(function() {
+        qr = new Html5Qrcode('reader');
+        QRScanner._tryStart(cameras[camIndex].id).catch(QRScanner._handleError);
+      }, 350);
+    });
+  },
+
+  onSuccess: function(code) {
+    if (isSweetAlertOpen) return;
+
+    // beep
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var osc = ctx.createOscillator();
+      osc.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch(e) {}
+
+    document.getElementById('scannedId').value       = code;
+    document.getElementById('studentIdManual').value = code;
+    document.getElementById('saveButton').disabled   = false;
+
+    isSweetAlertOpen = true;
+    Swal.fire({
+      title: 'สแกนสำเร็จ! ✅',
+      html:  'รหัส: <b>' + code + '</b><br>กรุณากรอกแต้มแล้วกดบันทึก',
+      icon:  'success',
+      confirmButtonText:  'ตกลง',
+      confirmButtonColor: '#1a3a5c',
+      allowOutsideClick:  false
+    }).then(function() {
+      isSweetAlertOpen = false;
+      document.getElementById('points').focus();
+      setStatus('กรุณากรอกแต้มแล้วกดบันทึก', 'info');
+    });
+  },
+
+  _handleError: function(err) {
+    var msg = 'ไม่สามารถเปิดกล้องได้';
+    var s   = String(err);
+    if (s.indexOf('NotAllowed')  !== -1) msg = '❌ กรุณาอนุญาตกล้องในเบราว์เซอร์';
+    if (s.indexOf('NotFound')    !== -1) msg = '❌ ไม่พบกล้อง';
+    if (s.indexOf('NotReadable') !== -1) msg = '❌ กล้องถูกใช้งานโดยแอพอื่น';
+    if (s.indexOf('Permission')  !== -1) msg = '❌ Permissions Policy บล็อก (อาจอยู่ใน iframe)';
+    setStatus(msg, 'error');
+    scanning = false;
+    document.getElementById('btnStart').disabled  = false;
+    document.getElementById('btnStop').disabled   = true;
+    document.getElementById('btnSwitch').disabled = true;
+  }
+};
+
+// ── Wire Events ──
+document.addEventListener('DOMContentLoaded', function() {
+
+  document.getElementById('btnLogin').addEventListener('click', doLogin);
+  document.getElementById('loginPass').addEventListener('keypress', function(e) {
+    if (e.keyCode === 13) doLogin();
+  });
+
+  document.getElementById('btnLogout').addEventListener('click', doLogout);
+
+  document.getElementById('btnStart') .addEventListener('click', function() { QRScanner.start(); });
+  document.getElementById('btnStop')  .addEventListener('click', function() { QRScanner.stop(); });
+  document.getElementById('btnSwitch').addEventListener('click', function() { QRScanner.switchCam(); });
+
+  document.getElementById('studentIdManual').addEventListener('keypress', function(e) {
+    if (e.keyCode === 13) document.getElementById('points').focus();
+  });
+  document.getElementById('points').addEventListener('keypress', function(e) {
+    if (e.keyCode === 13) doSave();
+  });
+  document.getElementById('saveButton').addEventListener('click', doSave);
+
+  // manual input → update scannedId + enable save
+  document.getElementById('studentIdManual').addEventListener('input', function() {
+    document.getElementById('scannedId').value = this.value;
+    document.getElementById('saveButton').disabled = this.value.trim() === '';
+  });
+});
+
+// ── Login ──
+function doLogin() {
+  var id   = document.getElementById('loginId').value.trim();
+  var pass = document.getElementById('loginPass').value.trim();
+  if (!id || !pass) { Swal.fire({ icon:'warning', title:'กรุณากรอกข้อมูลให้ครบ' }); return; }
+
+  var btn = document.getElementById('btnLogin');
+  btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...';
+
+  callAPI('login', { cashierId: id, password: pass })
+    .then(function(r) {
+      btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+      if (r && r.success) {
+        currentCashierId   = r.cashierId;
+        currentCashierName = r.name;
+        document.getElementById('cashierName').textContent = r.name;
+        document.getElementById('loginSection').classList.add('hidden');
+        document.getElementById('cashierSection').classList.remove('hidden');
+        // เปิดกล้องอัตโนมัติ
+        QRScanner.start();
+      } else {
+        Swal.fire({ icon:'error', title:'เข้าสู่ระบบไม่สำเร็จ', text: r ? r.message : 'ไม่ได้รับข้อมูล' });
+      }
+    })
+    .catch(function(err) {
+      btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+      Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text: err.message });
+    });
+}
+
+// ── Logout ──
+function doLogout() {
+  QRScanner.stop();
+  currentCashierId = currentCashierName = '';
+  recentList = []; renderRecent();
+  document.getElementById('cashierSection').classList.add('hidden');
+  document.getElementById('loginSection').classList.remove('hidden');
+  ['loginId','loginPass','scannedId','studentIdManual','points']
+    .forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('saveButton').disabled = true;
+  toggleSave(true);
+}
+
+// ── Save ──
+function doSave() {
+  var sid = document.getElementById('scannedId').value.trim() ||
+            document.getElementById('studentIdManual').value.trim();
+  var pts = parseInt(document.getElementById('points').value, 10);
+
+  if (!sid)          { Swal.fire({ icon:'warning', title:'กรุณาสแกนหรือกรอกรหัสนักเรียน' }); return; }
+  if (!pts || pts<1) { Swal.fire({ icon:'warning', title:'กรุณากรอกแต้มที่ถูกต้อง' }); return; }
+
+  toggleSave(false);
+  setStatus('กำลังบันทึก...', 'info');
+
+  callAPI('saveTransaction', { studentId: sid, points: pts, cashierId: currentCashierId })
+    .then(function(r) {
+      if (r && r.success) {
+        Swal.fire({
+          icon:'success', title:'บันทึกสำเร็จ! ✅',
+          html:'<b>'+r.studentName+'</b><br>+'+r.pointsAdded+' แต้ม<br>รวมสะสม: <b>'+r.totalPoints+' แต้ม</b>',
+          timer:2500, showConfirmButton:false
+        });
+        setStatus('บันทึกสำเร็จ ✅', 'success');
+
+        recentList.unshift({ sid:sid, name:r.studentName, pts:r.pointsAdded, total:r.totalPoints, time:new Date().toLocaleTimeString('th-TH') });
+        renderRecent();
+
+        document.getElementById('scannedId').value        = '';
+        document.getElementById('studentIdManual').value  = '';
+        document.getElementById('points').value           = '';
+        toggleSave(true);
+        document.getElementById('saveButton').disabled = true;
+
+        if (qr && !scanning) QRScanner.start();
+      } else {
+        Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด!', text: r ? r.message : 'ไม่ได้รับข้อมูล' });
+        setStatus(r ? r.message : 'error', 'error');
+        toggleSave(true);
+      }
+    })
+    .catch(function(err) {
+      Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด!', text: err.message });
+      setStatus('เกิดข้อผิดพลาด', 'error');
+      toggleSave(true);
+    });
+}
+
+// ── Recent ──
+function renderRecent() {
+  var el = document.getElementById('recentList');
+  if (!recentList.length) { el.innerHTML='<p class="empty-msg">ยังไม่มีรายการ</p>'; return; }
+  var html = '';
+  recentList.slice(0,10).forEach(function(x) {
+    html += '<div class="recent-item">';
+    html += '<div>'+x.name+' ('+x.sid+')</div>';
+    html += '<div class="pts">+'+x.pts+' แต้ม &nbsp;|&nbsp; รวม: '+x.total+' แต้ม <small style="color:#999;float:right;">'+x.time+'</small></div>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>

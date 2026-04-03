@@ -1,453 +1,895 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>สหกรณ์โรงเรียน - แคชเชียร์</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root { --navy:#1a3a5c; --gold:#c9a227; }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:'Sarabun',sans-serif; background:#f0f2f5; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>สแกนป้ายชื่อ</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Kanit:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+:root {
+  --navy:      #1a237e;
+  --navy-mid:  #283593;
+  --navy-lite: #3949ab;
+  --gold:      #f9a825;
+  --gold-lite: #fdd835;
+  --bg:        #eceff8;
+  --card:      #ffffff;
+  --text:      #1a1a2e;
+  --muted:     #78909c;
+  --success:   #2e7d32;
+  --danger:    #c62828;
+  --radius:    14px;
+  --shadow:    0 4px 20px rgba(26,35,126,.10);
+}
 
-    .header { background:var(--navy); padding:16px; text-align:center; }
-    .header h1 { color:var(--gold); font-size:20px; }
-    .header p  { color:#aaa; font-size:13px; margin-top:4px; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Sarabun', sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+}
 
-    .container { max-width:460px; margin:20px auto; padding:0 16px; }
+/* ── HEADER ── */
+.header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-lite) 100%);
+  padding: 20px 20px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -14px; left: 0; right: 0;
+  height: 28px;
+  background: var(--bg);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+.header-icon {
+  width: 52px; height: 52px;
+  background: rgba(255,255,255,.15);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+.header h1 {
+  font-family: 'Kanit', sans-serif;
+  font-size: 1.25rem;
+  color: var(--gold);
+  line-height: 1.2;
+}
+.header p {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,.7);
+  margin-top: 2px;
+}
+.student-count {
+  margin-left: auto;
+  background: rgba(255,255,255,.15);
+  border-radius: 99px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  color: white;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.student-count b { color: var(--gold-lite); }
 
-    .card { background:#fff; border-radius:12px; padding:24px;
-            box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:16px; }
-    .card-title { font-size:17px; font-weight:700; color:var(--navy);
-                  border-bottom:2px solid var(--gold); padding-bottom:10px; margin-bottom:20px; }
+/* ── CONTAINER ── */
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
 
-    .form-group { margin-bottom:16px; }
-    label { display:block; font-size:14px; color:#555; margin-bottom:6px; }
-    input[type="text"],
-    input[type="password"],
-    input[type="number"] {
-      width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;
-      font-size:16px; font-family:'Sarabun',sans-serif;
-    }
-    input:focus { outline:none; border-color:var(--navy); }
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.card-head {
+  padding: 12px 16px 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.card-body { padding: 12px 16px 16px; }
 
-    .btn { width:100%; padding:13px; border:none; border-radius:8px;
-           font-size:16px; font-family:'Sarabun',sans-serif;
-           font-weight:700; cursor:pointer; margin-bottom:6px; }
-    .btn-primary { background:var(--navy); color:#fff; }
-    .btn-green   { background:#4CAF50; color:#fff; }
-    .btn-gray    { background:#607d8b; color:#fff; }
-    .btn-gold    { background:var(--gold); color:#fff; }
-    .btn:active   { opacity:.85; }
-    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+/* ── SUBJECT INPUT ── */
+.input-wrap {
+  position: relative;
+}
+.input-wrap .ico {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+.subject-input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 2px solid #e0e4f5;
+  border-radius: 10px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 1rem;
+  background: #f8f9ff;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  color: var(--text);
+}
+.subject-input:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(26,35,126,.10);
+}
 
-    /* Camera Controls */
-    .cam-row { display:flex; gap:8px; margin:10px 0; }
-    .cam-row .btn { margin-bottom:0; font-size:14px; padding:10px; }
+/* ── BUTTONS ── */
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.btn {
+  padding: 13px 10px;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: .95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .18s;
+  display: flex; align-items: center; justify-content: center;
+  gap: 7px;
+  user-select: none;
+}
+.btn:active { transform: scale(.97); }
+.btn-navy { background: var(--navy); color: #fff; }
+.btn-navy:hover { background: var(--navy-mid); }
+.btn-navy.active { background: var(--danger); }
+.btn-gold { background: var(--gold); color: var(--navy); }
+.btn-gold:hover { filter: brightness(.95); }
 
-    /* Reader */
-    #reader { width:100%; border-radius:8px; overflow:hidden; margin-bottom:10px; }
+/* ── VIDEO ── */
+.video-wrap {
+  display: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  margin-top: 12px;
+  position: relative;
+}
+.video-wrap video {
+  width: 100%; display: block;
+}
+.btn-snap {
+  position: absolute;
+  bottom: 12px; left: 50%; transform: translateX(-50%);
+  background: #fff;
+  border: 3px solid var(--gold);
+  border-radius: 50%;
+  width: 60px; height: 60px;
+  font-size: 26px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  transition: transform .15s;
+}
+.btn-snap:active { transform: translateX(-50%) scale(.9); }
 
-    /* Status */
-    .status-box { padding:10px 14px; border-radius:8px; font-size:14px; margin-bottom:12px; }
-    .info    { background:#e3f2fd; color:#1565c0; }
-    .success { background:#e8f5e9; color:#2e7d32; }
-    .error   { background:#ffebee; color:#c62828; }
+/* ── PREVIEW ── */
+.preview-wrap {
+  display: none;
+  margin-top: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid #e0e4f5;
+  position: relative;
+}
+.preview-wrap img {
+  width: 100%; display: block;
+  max-height: 220px; object-fit: contain;
+  background: #f0f0f0;
+}
+.preview-retake {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(255,255,255,.9);
+  border: none; border-radius: 8px;
+  padding: 5px 12px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: .85rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--navy);
+}
 
-    /* Manual input */
-    .divider { text-align:center; color:#aaa; font-size:13px; margin:12px 0; position:relative; }
-    .divider::before, .divider::after {
-      content:''; position:absolute; top:50%; width:42%; height:1px; background:#eee;
-    }
-    .divider::before { left:0; } .divider::after { right:0; }
+/* ── PROGRESS ── */
+.progress-wrap {
+  display: none;
+  margin-top: 14px;
+}
+.progress-label {
+  font-size: .85rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+  display: flex; justify-content: space-between;
+}
+.progress-label span { color: var(--navy); font-weight: 700; }
+.progress-bg {
+  background: #e0e4f5;
+  border-radius: 99px;
+  height: 8px;
+  overflow: hidden;
+}
+.progress-bar {
+  background: linear-gradient(90deg, var(--navy), var(--navy-lite));
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  transition: width .25s ease;
+}
 
-    /* Cashier bar */
-    .cashier-bar { background:var(--navy); color:#fff; padding:10px 16px;
-                   border-radius:8px; margin-bottom:16px; font-size:14px;
-                   display:flex; justify-content:space-between; align-items:center; }
-    .cashier-bar span { color:var(--gold); font-weight:700; }
-    .cashier-bar a { color:#aaa; font-size:12px; cursor:pointer; }
+/* ── OCR RESULT ── */
+.ocr-result { display: none; }
+.ocr-raw {
+  background: #f5f6fc;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: .88rem;
+  white-space: pre-wrap;
+  color: #555;
+  min-height: 50px;
+  border-left: 3px solid var(--navy-lite);
+  line-height: 1.7;
+  word-break: break-all;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tag {
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: .85rem;
+  font-weight: 700;
+  display: flex; align-items: center; gap: 5px;
+}
+.tag-name   { background: #e8eaf6; color: var(--navy); }
+.tag-num    { background: #fff8e1; color: #e65100; }
+.tag-room   { background: #e8f5e9; color: #1b5e20; }
+.tag-nomatch{ background: #ffebee; color: var(--danger); }
 
-    /* Loading */
-    .save-wrap { position:relative; }
-    .loading-indicator { display:none; align-items:center; justify-content:center;
-                         gap:8px; padding:13px; }
-    .spinner { width:20px; height:20px; border:3px solid #f3f3f3;
-               border-top:3px solid #4CAF50; border-radius:50%;
-               animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
+/* ── STATUS ── */
+.status {
+  text-align: center;
+  font-size: .88rem;
+  padding: 8px;
+  border-radius: 8px;
+  display: none;
+  margin-top: 8px;
+}
+.status.info    { background: #e3f2fd; color: #1565c0; }
+.status.success { background: #e8f5e9; color: var(--success); }
+.status.error   { background: #ffebee; color: var(--danger); }
 
-    /* Recent */
-    .recent-item { background:#f8f9fb; border-left:4px solid var(--gold);
-                   padding:10px 12px; margin-bottom:8px; border-radius:0 8px 8px 0; font-size:13px; }
-    .recent-item .pts { font-weight:700; color:var(--navy); margin-top:3px; }
-    .empty-msg { color:#bbb; font-size:13px; text-align:center; padding:10px 0; }
+/* ── OCR RETRY ── */
+.retry-btn {
+  display: none;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f6fc;
+  border: 2px dashed #c5cae9;
+  border-radius: 10px;
+  color: var(--navy-lite);
+  font-family: 'Sarabun', sans-serif;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 
-    .hidden { display:none !important; }
-  </style>
+canvas { display: none; }
+#fileInput { display: none; }
+</style>
 </head>
 <body>
 
 <div class="header">
-  <h1>🏪 ร้านค้าสหกรณ์โรงเรียน</h1>
-  <p>ระบบบันทึกแต้มสะสม</p>
-</div>
-
-<!-- LOGIN -->
-<div class="container" id="loginSection">
-  <div class="card" style="margin-top:32px;">
-    <div class="card-title">🔐 เข้าสู่ระบบแคชเชียร์</div>
-    <div class="form-group">
-      <label>รหัสผู้ใช้</label>
-      <input type="text" id="loginId" placeholder="กรอกรหัสผู้ใช้" autocomplete="username">
+  <div class="header-inner">
+    <div class="header-icon">📛</div>
+    <div>
+      <h1>สแกนป้ายชื่อ<br>บันทึกคะแนน</h1>
+      <p>โรงเรียนศึกษานารี • สพม.กท1</p>
     </div>
-    <div class="form-group">
-      <label>รหัสผ่าน</label>
-      <input type="password" id="loginPass" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
-    </div>
-    <button class="btn btn-primary" id="btnLogin">เข้าสู่ระบบ</button>
+    <div class="student-count" id="countBadge">โหลด...</div>
   </div>
 </div>
 
-<!-- CASHIER -->
-<div class="container hidden" id="cashierSection">
-  <div class="cashier-bar">
-    <div>แคชเชียร์: <span id="cashierName"></span></div>
-    <a id="btnLogout">ออกจากระบบ</a>
-  </div>
+<div class="container">
 
+  <!-- วิชา -->
   <div class="card">
-    <div class="card-title">📲 บันทึกแต้มสะสม</div>
-
-    <!-- QR Reader -->
-    <div id="reader"></div>
-    <div id="statusBox" class="status-box info">กด "เริ่มสแกน" เพื่อเปิดกล้อง</div>
-
-    <!-- Camera buttons -->
-    <div class="cam-row">
-      <button class="btn btn-primary" id="btnStart" >▶ เริ่มสแกน</button>
-      <button class="btn btn-gray"    id="btnStop"   disabled>■ หยุด</button>
-      <button class="btn btn-gold"    id="btnSwitch" disabled>⇄ สลับกล้อง</button>
-    </div>
-
-    <!-- QR result (hidden input เก็บค่า) -->
-    <input type="hidden" id="scannedId">
-
-    <!-- Manual -->
-    <div class="divider">หรือกรอกเองด้านล่าง</div>
-    <div class="form-group">
-      <label>รหัสนักเรียน (กรอกเอง)</label>
-      <input type="text" id="studentIdManual" placeholder="กรอกรหัสนักเรียน" autocomplete="off">
-    </div>
-
-    <!-- Points -->
-    <div class="form-group">
-      <label>แต้มที่ได้รับ (= ยอดเงินที่ซื้อ)</label>
-      <input type="number" id="points" placeholder="เช่น 20" min="1">
-    </div>
-
-    <!-- Save -->
-    <div class="save-wrap">
-      <button class="btn btn-green" id="saveButton" disabled>✅ บันทึกแต้ม</button>
-      <div id="saveLoading" class="loading-indicator">
-        <div class="spinner"></div><span>กำลังบันทึก...</span>
+    <div class="card-head">📚 วิชา / ชีตบันทึก</div>
+    <div class="card-body">
+      <div class="input-wrap">
+        <span class="ico">📝</span>
+        <input class="subject-input" type="text" id="subjectInput"
+               placeholder="ชื่อวิชา เช่น คณิตศาสตร์ 1" value="คะแนน">
       </div>
     </div>
   </div>
 
-  <!-- Recent -->
+  <!-- กล้อง / ไฟล์ -->
   <div class="card">
-    <div class="card-title">📋 รายการล่าสุด (เซสชันนี้)</div>
-    <div id="recentList"><p class="empty-msg">ยังไม่มีรายการ</p></div>
+    <div class="card-head">📷 ถ่ายหรือเลือกภาพป้ายชื่อ</div>
+    <div class="card-body">
+      <div class="btn-row">
+        <button class="btn btn-navy" id="btnCamera">📷 เปิดกล้อง</button>
+        <button class="btn btn-gold" id="btnFile">🖼️ เลือกรูปภาพ</button>
+      </div>
+
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" autoplay playsinline muted></video>
+        <button class="btn-snap" id="btnSnap" title="ถ่ายภาพ">📸</button>
+      </div>
+
+      <div class="preview-wrap" id="previewWrap">
+        <img id="preview" alt="ภาพป้ายชื่อ">
+        <button class="preview-retake" id="btnRetake">↺ เปลี่ยน</button>
+      </div>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-label">
+          <span id="progressText">กำลังอ่านข้อความ...</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bg"><div class="progress-bar" id="progressBar"></div></div>
+      </div>
+    </div>
   </div>
+
+  <!-- ผลลัพธ์ OCR -->
+  <div class="card ocr-result" id="ocrResultCard">
+    <div class="card-head">🔍 ผลการอ่าน OCR</div>
+    <div class="card-body">
+      <div class="ocr-raw" id="ocrRaw"></div>
+      <div class="tags" id="tagsWrap"></div>
+      <button class="retry-btn" id="btnManual">🔎 เลือกนักเรียนด้วยตนเอง</button>
+    </div>
+  </div>
+
+  <div class="status" id="statusBar"></div>
+
 </div>
 
+<input type="file" id="fileInput" accept="image/*" capture="environment">
+<canvas id="canvas"></canvas>
+
 <script>
-// ══════════════════════════════════════════
-//  ⚙️  CONFIG — เปลี่ยนแค่บรรทัดนี้บรรทัดเดียว
-// ══════════════════════════════════════════
-var GAS_URL = 'https://script.google.com/a/macros/snr.ac.th/s/AKfycbxdEDIdw5vTK8F0Q0OhG6WxW8omu_AQ1TS7CPp_KL6fWMlATnmc2rTxmUpcAZlz0KU8/exec';
-// ══════════════════════════════════════════
+// ================================================================
+//  STATE
+// ================================================================
+var students = [];
+var cameraStream = null;
+var currentStudent = null;
 
-var currentCashierId   = '';
-var currentCashierName = '';
-var recentList         = [];
-var qr                 = null;
-var scanning           = false;
-var isSweetAlertOpen   = false;
-var cameras            = [];
-var camIndex           = 0;
+// ================================================================
+//  CONFIG — ใส่ URL จาก GAS Deploy ตรงนี้
+// ================================================================
+var GAS_URL = 'https://script.google.com/a/macros/snr.ac.th/s/AKfycbzMh1tgrwhVOjl5XACjyfcnV3hIRxnqWHV9ARx5M_LUaWcRmKNS4cpYFvABmr7AaZkR/exec';
 
-// ── API Helper ──
-// ใช้ POST + body เป็น plain string → ไม่มี CORS preflight
-function callAPI(action, params) {
-  var payload = Object.assign({ action: action }, params || {});
-  return fetch(GAS_URL, {
-    method: 'POST',
-    body:   JSON.stringify(payload)
-    // ❌ ห้ามใส่ Content-Type: application/json → จะทำให้มี preflight
-    // ✅ ไม่ใส่ → browser ส่งเป็น text/plain อัตโนมัติ → simple request
-  })
-  .then(function(res) { return res.json(); });
-}
-
-// ── Toggle Save Button ──
-function toggleSave(showBtn) {
-  var btn  = document.getElementById('saveButton');
-  var load = document.getElementById('saveLoading');
-  btn.style.display  = showBtn ? 'block' : 'none';
-  btn.disabled       = !showBtn;
-  load.style.display = showBtn ? 'none' : 'flex';
-}
-
-function setStatus(msg, type) {
-  var el = document.getElementById('statusBox');
-  el.textContent = msg;
-  el.className   = 'status-box ' + type;
-}
-
-// ── QR Scanner ──
-var QRScanner = {
-
-  start: function() {
-    if (!qr) qr = new Html5Qrcode('reader');
-    setStatus('กำลังเปิดกล้อง...', 'info');
-
-    // ลอง exact environment → environment → getCameras
-    this._tryStart({ facingMode: { exact: 'environment' } })
-      .catch(function() {
-        return QRScanner._tryStart({ facingMode: 'environment' });
-      })
-      .catch(function() {
-        return Html5Qrcode.getCameras().then(function(list) {
-          cameras  = list;
-          camIndex = list.length - 1; // กล้องหลังมักอยู่ท้ายสุด
-          if (!list.length) throw new Error('ไม่พบกล้อง');
-          return QRScanner._tryStart(list[camIndex].id);
-        });
-      })
-      .catch(function(err) { QRScanner._handleError(err); });
-  },
-
-  _tryStart: function(camConfig) {
-    return qr.start(
-      camConfig,
-      { fps:15, qrbox:{ width:220, height:220 }, aspectRatio:4/3 },
-      QRScanner.onSuccess,
-      function() {}
-    ).then(function() {
-      scanning = true;
-      document.getElementById('btnStart').disabled  = true;
-      document.getElementById('btnStop').disabled   = false;
-      document.getElementById('btnSwitch').disabled = false;
-      setStatus('กำลังสแกน...', 'info');
-    });
-  },
-
-  stop: function() {
-    if (qr && scanning) {
-      return qr.stop().then(function() {
-        scanning = false;
-        document.getElementById('btnStart').disabled  = false;
-        document.getElementById('btnStop').disabled   = true;
-        document.getElementById('btnSwitch').disabled = true;
-        setStatus('หยุดสแกน', 'info');
-      });
-    }
-    return Promise.resolve();
-  },
-
-  switchCam: function() {
-    if (cameras.length < 2) { setStatus('มีกล้องเดียว ไม่สามารถสลับได้', 'error'); return; }
-    camIndex = (camIndex + 1) % cameras.length;
-    QRScanner.stop().then(function() {
-      qr = null;
+// ================================================================
+//  LOAD STUDENTS
+// ================================================================
+function loadStudents() {
+  setStatus('กำลังโหลดข้อมูลนักเรียน...', 'info');
+  fetch(GAS_URL + '?action=getStudents')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        setStatus('โหลดข้อมูลไม่สำเร็จ: ' + data.error, 'error');
+        document.getElementById('countBadge').textContent = '⚠ ข้อมูล';
+        return;
+      }
+      students = data.students;
+      document.getElementById('countBadge').innerHTML =
+        'นักเรียน <b>' + students.length + '</b> คน';
+      setStatus('พร้อมใช้งาน ✓ โหลด ' + students.length + ' คน', 'success');
       setTimeout(function() {
-        qr = new Html5Qrcode('reader');
-        QRScanner._tryStart(cameras[camIndex].id).catch(QRScanner._handleError);
-      }, 350);
+        document.getElementById('statusBar').style.display = 'none';
+      }, 2000);
+    })
+    .catch(function(err) {
+      setStatus('โหลดไม่สำเร็จ: ' + err.message, 'error');
+      document.getElementById('countBadge').textContent = '⚠ ข้อมูล';
     });
-  },
+}
 
-  onSuccess: function(code) {
-    if (isSweetAlertOpen) return;
-
-    // beep
-    try {
-      var ctx = new (window.AudioContext || window.webkitAudioContext)();
-      var osc = ctx.createOscillator();
-      osc.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
-    } catch(e) {}
-
-    document.getElementById('scannedId').value       = code;
-    document.getElementById('studentIdManual').value = code;
-    document.getElementById('saveButton').disabled   = false;
-
-    isSweetAlertOpen = true;
-    Swal.fire({
-      title: 'สแกนสำเร็จ! ✅',
-      html:  'รหัส: <b>' + code + '</b><br>กรุณากรอกแต้มแล้วกดบันทึก',
-      icon:  'success',
-      confirmButtonText:  'ตกลง',
-      confirmButtonColor: '#1a3a5c',
-      allowOutsideClick:  false
-    }).then(function() {
-      isSweetAlertOpen = false;
-      document.getElementById('points').focus();
-      setStatus('กรุณากรอกแต้มแล้วกดบันทึก', 'info');
-    });
-  },
-
-  _handleError: function(err) {
-    var msg = 'ไม่สามารถเปิดกล้องได้';
-    var s   = String(err);
-    if (s.indexOf('NotAllowed')  !== -1) msg = '❌ กรุณาอนุญาตกล้องในเบราว์เซอร์';
-    if (s.indexOf('NotFound')    !== -1) msg = '❌ ไม่พบกล้อง';
-    if (s.indexOf('NotReadable') !== -1) msg = '❌ กล้องถูกใช้งานโดยแอพอื่น';
-    if (s.indexOf('Permission')  !== -1) msg = '❌ Permissions Policy บล็อก (อาจอยู่ใน iframe)';
-    setStatus(msg, 'error');
-    scanning = false;
-    document.getElementById('btnStart').disabled  = false;
-    document.getElementById('btnStop').disabled   = true;
-    document.getElementById('btnSwitch').disabled = true;
-  }
-};
-
-// ── Wire Events ──
-document.addEventListener('DOMContentLoaded', function() {
-
-  document.getElementById('btnLogin').addEventListener('click', doLogin);
-  document.getElementById('loginPass').addEventListener('keypress', function(e) {
-    if (e.keyCode === 13) doLogin();
-  });
-
-  document.getElementById('btnLogout').addEventListener('click', doLogout);
-
-  document.getElementById('btnStart') .addEventListener('click', function() { QRScanner.start(); });
-  document.getElementById('btnStop')  .addEventListener('click', function() { QRScanner.stop(); });
-  document.getElementById('btnSwitch').addEventListener('click', function() { QRScanner.switchCam(); });
-
-  document.getElementById('studentIdManual').addEventListener('keypress', function(e) {
-    if (e.keyCode === 13) document.getElementById('points').focus();
-  });
-  document.getElementById('points').addEventListener('keypress', function(e) {
-    if (e.keyCode === 13) doSave();
-  });
-  document.getElementById('saveButton').addEventListener('click', doSave);
-
-  // manual input → update scannedId + enable save
-  document.getElementById('studentIdManual').addEventListener('input', function() {
-    document.getElementById('scannedId').value = this.value;
-    document.getElementById('saveButton').disabled = this.value.trim() === '';
-  });
+// ================================================================
+//  CAMERA
+// ================================================================
+document.getElementById('btnCamera').addEventListener('click', function() {
+  if (cameraStream) { stopCamera(); return; }
+  startCamera();
 });
 
-// ── Login ──
-function doLogin() {
-  var id   = document.getElementById('loginId').value.trim();
-  var pass = document.getElementById('loginPass').value.trim();
-  if (!id || !pass) { Swal.fire({ icon:'warning', title:'กรุณากรอกข้อมูลให้ครบ' }); return; }
-
-  var btn = document.getElementById('btnLogin');
-  btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...';
-
-  callAPI('login', { cashierId: id, password: pass })
-    .then(function(r) {
-      btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
-      if (r && r.success) {
-        currentCashierId   = r.cashierId;
-        currentCashierName = r.name;
-        document.getElementById('cashierName').textContent = r.name;
-        document.getElementById('loginSection').classList.add('hidden');
-        document.getElementById('cashierSection').classList.remove('hidden');
-        // เปิดกล้องอัตโนมัติ
-        QRScanner.start();
-      } else {
-        Swal.fire({ icon:'error', title:'เข้าสู่ระบบไม่สำเร็จ', text: r ? r.message : 'ไม่ได้รับข้อมูล' });
-      }
-    })
-    .catch(function(err) {
-      btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
-      Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text: err.message });
-    });
-}
-
-// ── Logout ──
-function doLogout() {
-  QRScanner.stop();
-  currentCashierId = currentCashierName = '';
-  recentList = []; renderRecent();
-  document.getElementById('cashierSection').classList.add('hidden');
-  document.getElementById('loginSection').classList.remove('hidden');
-  ['loginId','loginPass','scannedId','studentIdManual','points']
-    .forEach(function(id) { document.getElementById(id).value = ''; });
-  document.getElementById('saveButton').disabled = true;
-  toggleSave(true);
-}
-
-// ── Save ──
-function doSave() {
-  var sid = document.getElementById('scannedId').value.trim() ||
-            document.getElementById('studentIdManual').value.trim();
-  var pts = parseInt(document.getElementById('points').value, 10);
-
-  if (!sid)          { Swal.fire({ icon:'warning', title:'กรุณาสแกนหรือกรอกรหัสนักเรียน' }); return; }
-  if (!pts || pts<1) { Swal.fire({ icon:'warning', title:'กรุณากรอกแต้มที่ถูกต้อง' }); return; }
-
-  toggleSave(false);
-  setStatus('กำลังบันทึก...', 'info');
-
-  callAPI('saveTransaction', { studentId: sid, points: pts, cashierId: currentCashierId })
-    .then(function(r) {
-      if (r && r.success) {
-        Swal.fire({
-          icon:'success', title:'บันทึกสำเร็จ! ✅',
-          html:'<b>'+r.studentName+'</b><br>+'+r.pointsAdded+' แต้ม<br>รวมสะสม: <b>'+r.totalPoints+' แต้ม</b>',
-          timer:2500, showConfirmButton:false
-        });
-        setStatus('บันทึกสำเร็จ ✅', 'success');
-
-        recentList.unshift({ sid:sid, name:r.studentName, pts:r.pointsAdded, total:r.totalPoints, time:new Date().toLocaleTimeString('th-TH') });
-        renderRecent();
-
-        document.getElementById('scannedId').value        = '';
-        document.getElementById('studentIdManual').value  = '';
-        document.getElementById('points').value           = '';
-        toggleSave(true);
-        document.getElementById('saveButton').disabled = true;
-
-        if (qr && !scanning) QRScanner.start();
-      } else {
-        Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด!', text: r ? r.message : 'ไม่ได้รับข้อมูล' });
-        setStatus(r ? r.message : 'error', 'error');
-        toggleSave(true);
-      }
-    })
-    .catch(function(err) {
-      Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด!', text: err.message });
-      setStatus('เกิดข้อผิดพลาด', 'error');
-      toggleSave(true);
-    });
-}
-
-// ── Recent ──
-function renderRecent() {
-  var el = document.getElementById('recentList');
-  if (!recentList.length) { el.innerHTML='<p class="empty-msg">ยังไม่มีรายการ</p>'; return; }
-  var html = '';
-  recentList.slice(0,10).forEach(function(x) {
-    html += '<div class="recent-item">';
-    html += '<div>'+x.name+' ('+x.sid+')</div>';
-    html += '<div class="pts">+'+x.pts+' แต้ม &nbsp;|&nbsp; รวม: '+x.total+' แต้ม <small style="color:#999;float:right;">'+x.time+'</small></div>';
-    html += '</div>';
+function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus('เบราว์เซอร์ไม่รองรับกล้อง กรุณาใช้ปุ่ม "เลือกรูปภาพ" แทน', 'error');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: 'environment' },
+      width:  { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  }).then(function(s) {
+    cameraStream = s;
+    var v = document.getElementById('video');
+    v.srcObject = s;
+    document.getElementById('videoWrap').style.display = 'block';
+    document.getElementById('previewWrap').style.display = 'none';
+    document.getElementById('btnCamera').textContent = '⛔ ปิดกล้อง';
+    document.getElementById('btnCamera').classList.add('active');
+  }).catch(function(err) {
+    setStatus('ไม่สามารถเปิดกล้องได้ (' + err.name + ') — ลองใช้ "เลือกรูปภาพ" แทน', 'error');
   });
-  el.innerHTML = html;
 }
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(function(t) { t.stop(); });
+    cameraStream = null;
+  }
+  document.getElementById('videoWrap').style.display = 'none';
+  document.getElementById('btnCamera').textContent = '📷 เปิดกล้อง';
+  document.getElementById('btnCamera').classList.remove('active');
+}
+
+document.getElementById('btnSnap').addEventListener('click', function() {
+  var video = document.getElementById('video');
+  var canvas = document.getElementById('canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+  stopCamera();
+  showPreview(dataUrl);
+  startOCR(dataUrl);
+});
+
+// ================================================================
+//  FILE INPUT
+// ================================================================
+document.getElementById('btnFile').addEventListener('click', function() {
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    showPreview(ev.target.result);
+    resetOCR();
+    startOCR(ev.target.result);
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+document.getElementById('btnRetake').addEventListener('click', function() {
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('ocrResultCard').style.display = 'none';
+  document.getElementById('btnManual').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
+  currentStudent = null;
+});
+
+function showPreview(src) {
+  document.getElementById('preview').src = src;
+  document.getElementById('previewWrap').style.display = 'block';
+}
+
+// ================================================================
+//  OCR
+// ================================================================
+function resetOCR() {
+  document.getElementById('ocrResultCard').style.display = 'none';
+  document.getElementById('btnManual').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('statusBar').style.display = 'none';
+}
+
+function startOCR(imageData) {
+  var progressWrap = document.getElementById('progressWrap');
+  var progressBar  = document.getElementById('progressBar');
+  var progressText = document.getElementById('progressText');
+  var progressPct  = document.getElementById('progressPct');
+
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressText.textContent = 'เริ่มต้นระบบ OCR...';
+  progressPct.textContent  = '0%';
+
+  Tesseract.recognize(imageData, 'tha+eng', {
+    logger: function(m) {
+      if (m.status === 'loading language traineddata') {
+        progressText.textContent = 'โหลดภาษาไทย... (ครั้งแรกอาจช้าหน่อย)';
+        progressBar.style.width = '15%';
+        progressPct.textContent  = '15%';
+      } else if (m.status === 'initializing tesseract') {
+        progressText.textContent = 'เริ่มต้น Tesseract...';
+        progressBar.style.width = '20%';
+        progressPct.textContent  = '20%';
+      } else if (m.status === 'recognizing text') {
+        var pct = Math.round(20 + m.progress * 80);
+        progressBar.style.width  = pct + '%';
+        progressPct.textContent  = pct + '%';
+        progressText.textContent = 'กำลังอ่านข้อความ...';
+      }
+    }
+  }).then(function(result) {
+    progressBar.style.width  = '100%';
+    progressPct.textContent  = '100%';
+    progressText.textContent = 'อ่านเสร็จสิ้น ✓';
+    setTimeout(function() {
+      progressWrap.style.display = 'none';
+    }, 800);
+
+    var rawText = result.data.text;
+    processOCRResult(rawText);
+  }).catch(function(err) {
+    progressWrap.style.display = 'none';
+    setStatus('OCR ล้มเหลว: ' + err.message, 'error');
+  });
+}
+
+// ================================================================
+//  PARSE OCR TEXT
+// ================================================================
+function parseNameTag(text) {
+  // Normalize: replace multiple spaces/tabs with single space
+  var lines = text.replace(/\r/g, '').split('\n')
+    .map(function(l) { return l.replace(/\s+/g, ' ').trim(); })
+    .filter(function(l) { return l.length > 0; });
+
+  var name   = '';
+  var number = '';
+  var room   = '';
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    // เลขที่ → ดึงตัวเลข
+    var numMatch = line.match(/เลขที่\s*(\d+)/);
+    if (numMatch && !number) {
+      number = numMatch[1];
+    }
+
+    // ม.X/X หรือ ม X/X → room = หลัง /
+    var roomMatch = line.match(/ม\.?\s*\d+\s*[\/\\]\s*(\d+)/);
+    if (roomMatch && !room) {
+      room = roomMatch[1];
+    }
+
+    // ถ้าไม่มี / แต่มีแค่ ม.X → room อาจเป็น X
+    if (!room) {
+      var gradeOnly = line.match(/^ม\.?\s*(\d+)\s*$/);
+      if (gradeOnly) room = gradeOnly[1];
+    }
+
+    // ชื่อ: บรรทัดที่มีอักษรไทยเป็นหลัก ไม่ใช่บรรทัดเลขที่/ม.
+    if (!name && !numMatch && !line.match(/ม\.?\s*\d/) && !line.match(/^\d+$/) && line.length >= 2) {
+      var thaiCount = (line.match(/[\u0E00-\u0E7F]/g) || []).length;
+      if (thaiCount >= 2) {
+        name = line;
+      }
+    }
+  }
+
+  return { name: name, number: number, room: room };
+}
+
+function processOCRResult(text) {
+  // แสดง raw OCR
+  var card = document.getElementById('ocrResultCard');
+  card.style.display = 'block';
+  document.getElementById('ocrRaw').textContent = text || '(ไม่พบข้อความ)';
+
+  var parsed = parseNameTag(text);
+
+  // แสดง tags
+  var tagsWrap = document.getElementById('tagsWrap');
+  tagsWrap.innerHTML = '';
+  if (parsed.name)   tagsWrap.innerHTML += '<span class="tag tag-name">👤 ' + parsed.name + '</span>';
+  if (parsed.number) tagsWrap.innerHTML += '<span class="tag tag-num">🔢 เลขที่ ' + parsed.number + '</span>';
+  if (parsed.room)   tagsWrap.innerHTML += '<span class="tag tag-room">🏫 ห้อง ' + parsed.room + '</span>';
+
+  if (!parsed.name && !parsed.number) {
+    tagsWrap.innerHTML += '<span class="tag tag-nomatch">⚠ อ่านข้อความไม่ได้ กรุณาเลือกด้วยตนเอง</span>';
+  }
+
+  // Match นักเรียน
+  var matched = findBestMatch(parsed);
+
+  if (matched) {
+    currentStudent = matched;
+    showScorePopup(matched);
+  } else {
+    setStatus('ไม่พบนักเรียนที่ตรงกัน', 'error');
+    document.getElementById('btnManual').style.display = 'block';
+  }
+}
+
+// ================================================================
+//  FUZZY MATCH
+// ================================================================
+function findBestMatch(parsed) {
+  if (!students.length) return null;
+
+  var best = null;
+  var bestScore = 0;
+
+  for (var i = 0; i < students.length; i++) {
+    var s = students[i];
+    var score = 0;
+
+    // ── ชื่อ ──
+    if (parsed.name && s.name) {
+      var a = parsed.name.replace(/\s/g, '');
+      var b = s.name.replace(/\s/g, '');
+      if (a === b) {
+        score += 20;
+      } else if (b.indexOf(a) >= 0 || a.indexOf(b) >= 0) {
+        score += 12;
+      } else {
+        var ov = charOverlapRatio(a, b);
+        score += Math.round(ov * 10);
+      }
+    }
+
+    // ── เลขที่ ──
+    if (parsed.number && s.number) {
+      if (s.number === parsed.number) score += 8;
+    }
+
+    // ── ห้อง ──
+    if (parsed.room && s.room) {
+      if (s.room === parsed.room) score += 4;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+
+  // ต้องการ score ขั้นต่ำ
+  return bestScore >= 8 ? best : null;
+}
+
+function charOverlapRatio(a, b) {
+  if (!a || !b) return 0;
+  var count = 0;
+  for (var i = 0; i < a.length; i++) {
+    if (b.indexOf(a[i]) >= 0) count++;
+  }
+  return count / Math.max(a.length, b.length);
+}
+
+// ================================================================
+//  MANUAL SEARCH
+// ================================================================
+document.getElementById('btnManual').addEventListener('click', function() {
+  showManualSearch(null);
+});
+
+function showManualSearch(hintParsed) {
+  // สร้าง options ทั้งหมด
+  var opts = '<option value="">-- เลือกนักเรียน --</option>';
+
+  // ถ้ามี hint ให้แสดงผลที่ตรงห้องก่อน
+  var list = students.slice();
+  if (hintParsed && hintParsed.room) {
+    list.sort(function(a, b) {
+      var aMatch = a.room === hintParsed.room ? 0 : 1;
+      var bMatch = b.room === hintParsed.room ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      return parseInt(a.number) - parseInt(b.number);
+    });
+  }
+
+  for (var i = 0; i < list.length; i++) {
+    var s = list[i];
+    opts += '<option value="' + s.id + '">' +
+      s.name + '  (เลขที่ ' + s.number + '  ห้อง ' + s.room + ')' +
+    '</option>';
+  }
+
+  Swal.fire({
+    title: '<span style="font-family:Kanit,sans-serif;color:#1a237e">เลือกนักเรียน</span>',
+    html:
+      '<div style="font-family:Sarabun,sans-serif">' +
+      '<p style="color:#78909c;font-size:.9rem;margin-bottom:12px">OCR อาจอ่านไม่ชัด กรุณาเลือกนักเรียนที่ถูกต้อง</p>' +
+      '<select id="swal-select" style="width:100%;padding:10px 12px;border:2px solid #1a237e;' +
+        'border-radius:10px;font-family:Sarabun,sans-serif;font-size:.95rem;outline:none">' +
+      opts +
+      '</select></div>',
+    confirmButtonText:  '✓ เลือกนักเรียนนี้',
+    cancelButtonText:   'ยกเลิก',
+    showCancelButton:   true,
+    confirmButtonColor: '#1a237e',
+    cancelButtonColor:  '#90a4ae',
+    focusConfirm: false,
+    preConfirm: function() {
+      var val = document.getElementById('swal-select').value;
+      if (!val) { Swal.showValidationMessage('กรุณาเลือกนักเรียน'); return false; }
+      for (var i = 0; i < students.length; i++) {
+        if (students[i].id === val) return students[i];
+      }
+      return false;
+    }
+  }).then(function(res) {
+    if (res.isConfirmed && res.value) {
+      currentStudent = res.value;
+      showScorePopup(res.value);
+    }
+  });
+}
+
+// ================================================================
+//  SCORE POPUP
+// ================================================================
+function showScorePopup(student) {
+  var subject = document.getElementById('subjectInput').value.trim() || 'คะแนน';
+
+  Swal.fire({
+    title: '<span style="font-family:Kanit,sans-serif;color:#1a237e;font-size:1.15rem">พบนักเรียน 🎉</span>',
+    html:
+      '<div style="font-family:Sarabun,sans-serif">' +
+      
+      // Student card
+      '<div style="background:linear-gradient(135deg,#1a237e,#3949ab);border-radius:12px;' +
+        'padding:16px;margin-bottom:16px;color:white;text-align:center">' +
+      '<div style="font-size:1.45rem;font-weight:700;letter-spacing:.02em;margin-bottom:6px">' +
+        student.name +
+      '</div>' +
+      '<div style="font-size:.85rem;opacity:.85;display:flex;justify-content:center;gap:16px">' +
+        '<span>🆔 ' + student.id + '</span>' +
+        '<span>🔢 เลขที่ ' + student.number + '</span>' +
+        '<span>🏫 ห้อง ' + student.room + '</span>' +
+      '</div>' +
+      '</div>' +
+
+      // Subject & score
+      '<div style="text-align:left;margin-bottom:8px;font-size:.9rem;color:#555">' +
+        '📚 วิชา: <b style="color:#1a237e">' + subject + '</b>' +
+      '</div>' +
+      '<input id="swal-score" type="number" min="0" max="100" step="0.5"' +
+        ' placeholder="กรอกคะแนน"' +
+        ' style="width:100%;padding:16px;border:2px solid #1a237e;border-radius:10px;' +
+          'font-size:1.6rem;text-align:center;font-family:Sarabun,sans-serif;outline:none;' +
+          'font-weight:700;color:#1a237e">' +
+      '</div>',
+
+    showCancelButton:   true,
+    confirmButtonText:  '💾 บันทึกคะแนน',
+    cancelButtonText:   'ยกเลิก',
+    confirmButtonColor: '#1a237e',
+    cancelButtonColor:  '#90a4ae',
+    focusConfirm: false,
+
+    preConfirm: function() {
+      var val = document.getElementById('swal-score').value;
+      if (val === '' || isNaN(parseFloat(val))) {
+        Swal.showValidationMessage('กรุณากรอกคะแนนให้ถูกต้อง');
+        return false;
+      }
+      var n = parseFloat(val);
+      if (n < 0 || n > 100) {
+        Swal.showValidationMessage('คะแนนต้องอยู่ระหว่าง 0 – 100');
+        return false;
+      }
+      return n;
+    },
+
+    didOpen: function() {
+      setTimeout(function() {
+        var inp = document.getElementById('swal-score');
+        if (inp) inp.focus();
+      }, 200);
+    }
+  }).then(function(res) {
+    if (res.isConfirmed) {
+      doSaveScore(res.value, subject);
+    }
+  });
+}
+
+// ================================================================
+//  SAVE SCORE
+// ================================================================
+function doSaveScore(score, subject) {
+  Swal.fire({
+    title: 'กำลังบันทึก...',
+    allowOutsideClick: false,
+    didOpen: function() { Swal.showLoading(); }
+  });
+
+  fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action:  'saveScore',
+      id:      currentStudent.id,
+      name:    currentStudent.name,
+      number:  currentStudent.number,
+      room:    currentStudent.room,
+      score:   score,
+      subject: subject
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.error) {
+      Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: data.error, confirmButtonColor: '#1a237e' });
+      return;
+    }
+    var modeText = data.mode === 'update' ? '(อัปเดตคะแนนเดิม)' : '(เพิ่มใหม่)';
+    Swal.fire({
+      icon: 'success',
+      title: 'บันทึกสำเร็จ! ✓',
+      html:
+        '<div style="font-family:Sarabun,sans-serif">' +
+        '<b style="font-size:1.1rem">' + currentStudent.name + '</b><br>' +
+        'คะแนน: <b style="font-size:1.3rem;color:#1a237e">' + score + '</b> คะแนน<br>' +
+        '<small style="color:#78909c">' + subject + ' ' + modeText + '</small>' +
+        '</div>',
+      confirmButtonColor: '#1a237e',
+      timer: 3000,
+      timerProgressBar: true
+    });
+    setStatus(currentStudent.name + ' บันทึก ' + score + ' คะแนน ✓', 'success');
+  })
+  .catch(function(err) {
+    Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.message, confirmButtonColor: '#1a237e' });
+  });
+}
+
+// ================================================================
+//  HELPERS
+// ================================================================
+function setStatus(msg, type) {
+  var bar = document.getElementById('statusBar');
+  bar.textContent = msg;
+  bar.className = 'status ' + (type || 'info');
+  bar.style.display = 'block';
+}
+
+// ================================================================
+//  INIT
+// ================================================================
+loadStudents();
 </script>
 </body>
 </html>

@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AR Word Hunter · นักล่าคำศัพท์อังกฤษ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   0) DESIGN TOKENS
+   ============================================================ */
+:root{
+  --bg:        #170F2E;
+  --bg2:       #241246;
+  --panel:     rgba(36,18,70,0.72);
+  --panel-solid:#241246;
+  --coral:     #FF4D6D;
+  --teal:      #00E6C3;
+  --yellow:    #FFD23F;
+  --ink:       #FDFBF7;
+  --dim:       rgba(253,251,247,0.62);
+  --danger:    #FF4D6D;
+  --success:   #00E6C3;
+  --ring:      rgba(255,255,255,0.14);
+  --shadow:    0 18px 40px rgba(0,0,0,0.35);
+  --radius:    22px;
+  --disp:      'Fredoka', 'Noto Sans Thai', sans-serif;
+  --thai:      'Noto Sans Thai', sans-serif;
+  --cn:        'Fredoka', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{
+  margin:0; padding:0; height:100%;
+  background:
+    radial-gradient(circle at 15% 10%, #2b1657 0%, transparent 45%),
+    radial-gradient(circle at 85% 90%, #1c2b57 0%, transparent 50%),
+    var(--bg);
+  color:var(--ink);
+  font-family:var(--thai);
+  overflow:hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select:none;
+}
+#app{position:relative; width:100vw; height:100vh; height:100dvh;}
+.screen{
+  position:absolute; inset:0;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  overflow-y:auto;
+}
+.screen.active{display:flex;}
+
+/* background decorative target-ring motif, reused across screens as the visual signature */
+.bg-rings{position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; opacity:0.5;}
+.bg-rings span{
+  position:absolute; border-radius:50%; border:2px solid rgba(255,255,255,0.06);
+}
+.bg-rings span:nth-child(1){width:520px;height:520px; top:-160px; left:-160px;}
+.bg-rings span:nth-child(2){width:340px;height:340px; top:60%; left:78%;}
+.bg-rings span:nth-child(3){width:220px;height:220px; top:8%; left:70%; border-color:rgba(255,210,63,0.10);}
+.bg-rings span:nth-child(4){width:160px;height:160px; top:75%; left:5%; border-color:rgba(0,230,195,0.12);}
+
+h1,h2,h3{font-family:var(--disp); margin:0;}
+
+/* ============================================================
+   1) START SCREEN
+   ============================================================ */
+.card{
+  position:relative; z-index:1;
+  width:min(560px, 96vw);
+  background:var(--panel);
+  backdrop-filter: blur(14px);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:26px 24px;
+}
+.title-eyebrow{
+  display:inline-block; font-family:var(--cn); font-weight:900; font-size:13px;
+  letter-spacing:.14em; color:var(--yellow); background:rgba(255,210,63,0.12);
+  padding:4px 10px; border-radius:999px; margin-bottom:10px;
+}
+.title-main{font-size:clamp(28px,6vw,38px); font-weight:700; line-height:1.15;}
+.title-main .cn{font-family:var(--cn); color:var(--coral);}
+.subtitle{color:var(--dim); font-size:14px; margin-top:8px; line-height:1.6;}
+
+.mode-picker{display:flex; gap:10px; margin-top:20px;}
+.mode-btn{
+  flex:1; padding:16px 10px; border-radius:16px; border:2px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.04); color:var(--ink); cursor:pointer; text-align:center;
+  font-family:var(--thai); font-weight:600; transition:.15s;
+}
+.mode-btn .ico{font-size:26px; display:block; margin-bottom:6px;}
+.mode-btn.selected{border-color:var(--teal); background:rgba(0,230,195,0.14); box-shadow:0 0 0 3px rgba(0,230,195,0.15);}
+
+.teacher-toggle{
+  margin-top:18px; display:flex; align-items:center; justify-content:space-between;
+  padding:12px 14px; border-radius:14px; background:rgba(255,255,255,0.04); cursor:pointer;
+  font-weight:600; font-size:14px;
+}
+.teacher-panel{display:none; margin-top:10px; padding:14px; border-radius:14px; background:rgba(0,0,0,0.18);}
+.teacher-panel.open{display:block;}
+.field{margin-bottom:12px;}
+.field label{display:flex; justify-content:space-between; font-size:13px; color:var(--dim); margin-bottom:6px;}
+.field input[type=range]{width:100%; accent-color:var(--teal);}
+.field input[type=number]{width:100%; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); color:var(--ink); font-size:14px;}
+.field input[type=color]{width:100%; height:38px; border:none; border-radius:10px; background:none; cursor:pointer;}
+.field input[type=text]{width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); color:var(--ink); font-size:14px; font-family:var(--thai);}
+
+.name-field{margin-top:16px;}
+.name-field label{font-size:13px; color:var(--dim); margin-bottom:6px; display:block;}
+
+.checkline{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--dim); margin-top:12px;}
+.checkline input{accent-color:var(--teal);}
+
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  border:none; border-radius:16px; padding:15px 22px; font-family:var(--thai); font-weight:700; font-size:16px;
+  cursor:pointer; transition:.15s; width:100%;
+}
+.btn-primary{background:linear-gradient(135deg, var(--coral), #ff7a8f); color:#1A0B15; box-shadow:0 10px 24px rgba(255,77,109,0.35);}
+.btn-primary:active{transform:scale(.98);}
+.btn-secondary{background:rgba(255,255,255,0.08); color:var(--ink); margin-top:10px;}
+.btn-ghost{background:transparent; color:var(--dim); text-decoration:underline; padding:6px;}
+
+.cam-note{font-size:12px; color:var(--dim); margin-top:12px; line-height:1.6; text-align:center;}
+
+/* ============================================================
+   2) CALIBRATION / STAGE (shared camera+canvas area)
+   ============================================================ */
+.stage-wrap{position:relative; z-index:1; width:min(720px,96vw); }
+.stage{
+  position:relative; width:100%; aspect-ratio: 4 / 3; border-radius:var(--radius); overflow:hidden;
+  background:#000; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,0.08);
+  transform: scaleX(-1); /* mirror video + overlay together so coordinates stay aligned */
+}
+.stage video{width:100%; height:100%; object-fit:cover; display:block;}
+.stage canvas{position:absolute; inset:0; width:100%; height:100%;}
+
+.stage-hint{
+  position:absolute; z-index:2; left:50%; transform:translateX(-50%); bottom:14px;
+  background:rgba(0,0,0,0.55); padding:8px 16px; border-radius:999px; font-size:13px;
+  white-space:nowrap; max-width:92%; text-align:center;
+}
+.calib-controls{display:flex; gap:10px; margin-top:14px; width:100%;}
+.calib-controls .btn{margin-top:0;}
+.calib-count{
+  position:absolute; z-index:2; top:12px; left:12px; background:rgba(0,0,0,0.55);
+  padding:6px 12px; border-radius:999px; font-family:var(--disp); font-weight:600; font-size:14px;
+  transform: scaleX(-1); /* undo parent mirror so text reads correctly */
+}
+
+/* ============================================================
+   3) GAME HUD (used in both quiz + touch modes)
+   ============================================================ */
+.hud-top{
+  position:absolute; z-index:3; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; align-items:flex-start;
+  transform: scaleX(-1);
+  pointer-events:none;
+}
+.hud-score, .hud-timer{
+  background:rgba(0,0,0,0.5); border-radius:16px; padding:8px 14px; text-align:center; min-width:78px;
+}
+.hud-score .val{font-family:var(--disp); font-size:24px; font-weight:700; color:var(--yellow); line-height:1;}
+.hud-score .lbl, .hud-timer .lbl{font-size:10px; color:var(--dim); letter-spacing:.06em;}
+.hud-timer .val{font-family:var(--disp); font-size:24px; font-weight:700; line-height:1;}
+.hud-timer.low .val{color:var(--coral);}
+
+.hud-hits{background:rgba(0,0,0,0.5); border-radius:16px; padding:8px 14px; text-align:center; min-width:60px;}
+.hud-hits .val{font-family:var(--disp); font-size:20px; font-weight:700; color:var(--teal); line-height:1;}
+.hud-hits .lbl{font-size:10px; color:var(--dim);}
+
+.bonus-banner{
+  position:absolute; z-index:5; top:0; left:0; right:0; padding:14px; text-align:center;
+  background:linear-gradient(135deg, var(--yellow), #ffb23f); color:#241246; font-family:var(--disp);
+  font-weight:700; font-size:18px; transform:translateY(-120%) scaleX(-1); transition:transform .35s ease;
+}
+.bonus-banner.show{transform:translateY(0) scaleX(-1);}
+
+.flash-effect{
+  position:absolute; z-index:6; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--disp); font-weight:700; font-size:clamp(22px,6vw,34px); text-align:center;
+  opacity:0; pointer-events:none; transform: scaleX(-1);
+}
+.flash-effect.good{color:var(--success); text-shadow:0 0 24px rgba(0,230,195,0.7);}
+.flash-effect.bad{color:var(--danger); text-shadow:0 0 24px rgba(255,77,109,0.7);}
+.flash-effect.play{animation:flashPop .7s ease forwards;}
+@keyframes flashPop{
+  0%{opacity:0; transform:scaleX(-1) scale(.7);}
+  20%{opacity:1; transform:scaleX(-1) scale(1.08);}
+  70%{opacity:1; transform:scaleX(-1) scale(1);}
+  100%{opacity:0; transform:scaleX(-1) scale(1);}
+}
+
+/* Quiz mode overlays (question + 3 answer zones) */
+.quiz-question{
+  position:absolute; z-index:4; top:56px; left:50%; transform:translateX(-50%) scaleX(-1);
+  background:rgba(0,0,0,0.55); padding:10px 22px; border-radius:18px; text-align:center;
+}
+.quiz-question .cn{font-family:var(--cn); font-weight:700; font-size:clamp(24px,6.5vw,36px); line-height:1.1; text-transform:uppercase; letter-spacing:.02em;}
+.quiz-question .qtimer{font-size:12px; color:var(--yellow); margin-top:2px;}
+
+.answer-zone{
+  position:absolute; z-index:4; transform:scaleX(-1);
+  width:30%; min-height:64px; border-radius:16px; border:3px solid var(--zone-color, #fff);
+  background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:8px; font-family:var(--thai); font-weight:600; font-size:clamp(13px,3.4vw,17px);
+}
+.answer-zone .progress{
+  position:absolute; inset:-3px; border-radius:16px; border:4px solid transparent;
+  border-top-color:var(--yellow); transition:transform .05s linear; pointer-events:none;
+}
+.answer-zone.correct{background:rgba(0,230,195,0.28);}
+.answer-zone.wrong{background:rgba(255,77,109,0.28);}
+.zone-a{bottom:8%; left:3%;}
+.zone-b{bottom:2%; left:35%;}
+.zone-c{bottom:8%; right:3%;}
+
+/* Touch-cone mode target rings */
+.target-ring{
+  position:absolute; z-index:4; width:70px; height:70px; margin-left:-35px; margin-top:-35px;
+  border-radius:50%; border:4px solid var(--zone-color,#fff); display:flex; align-items:center; justify-content:center;
+  transform:scaleX(-1);
+}
+.target-ring::after{
+  content:''; position:absolute; inset:10px; border-radius:50%; background:rgba(255,255,255,0.12);
+}
+.target-ring.active{animation:pulseTarget 0.9s ease-in-out infinite;}
+.target-ring.bonus{border-color:var(--yellow) !important; animation:pulseBonus 0.5s ease-in-out infinite;}
+@keyframes pulseTarget{0%,100%{box-shadow:0 0 0 0 rgba(0,230,195,0.5);} 50%{box-shadow:0 0 0 14px rgba(0,230,195,0);}}
+@keyframes pulseBonus{0%,100%{box-shadow:0 0 0 0 rgba(255,210,63,0.6);} 50%{box-shadow:0 0 0 18px rgba(255,210,63,0);}}
+.target-label{
+  position:absolute; z-index:4; transform:translate(-50%,-140%) scaleX(-1);
+  background:rgba(0,0,0,0.55); padding:2px 8px; border-radius:8px; font-size:11px; white-space:nowrap;
+}
+
+/* cursor (fingertip) */
+.pointer-dot{
+  position:absolute; z-index:7; width:26px; height:26px; margin-left:-13px; margin-top:-13px;
+  border-radius:50%; background:radial-gradient(circle, rgba(0,230,195,0.9), rgba(0,230,195,0));
+  box-shadow:0 0 18px 6px rgba(0,230,195,0.55); pointer-events:none;
+}
+
+/* ============================================================
+   4) COUNTDOWN
+   ============================================================ */
+.countdown-num{font-family:var(--disp); font-size:120px; font-weight:700; color:var(--yellow); text-shadow:0 0 40px rgba(255,210,63,0.5);}
+
+/* ============================================================
+   5) END SCREEN
+   ============================================================ */
+.results-grid{display:flex; gap:10px; margin:18px 0;}
+.result-box{flex:1; background:rgba(255,255,255,0.05); border-radius:14px; padding:14px 8px; text-align:center;}
+.result-box .val{font-family:var(--disp); font-size:26px; font-weight:700; color:var(--yellow);}
+.result-box .lbl{font-size:11px; color:var(--dim); margin-top:4px;}
+
+.leaderboard{margin-top:10px; max-height:220px; overflow-y:auto; border-radius:14px; background:rgba(0,0,0,0.2);}
+.lb-row{display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,0.06);}
+.lb-row:last-child{border-bottom:none;}
+.lb-rank{width:22px; font-family:var(--disp); font-weight:700; color:var(--teal);}
+.lb-name{flex:1;}
+.lb-score{font-family:var(--disp); font-weight:700; color:var(--yellow);}
+.lb-date{font-size:11px; color:var(--dim);}
+
+@media (max-width:480px){
+  .zone-a, .zone-c{width:32%;}
+  .answer-zone{font-size:12px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SCREEN: START ============ -->
+  <div class="screen active" id="screen-start">
+    <div class="bg-rings"><span></span><span></span><span></span><span></span></div>
+    <div class="card">
+      <span class="title-eyebrow">AR WORD GAME</span>
+      <h1 class="title-main">นักล่าคำศัพท์อังกฤษ <span class="cn">Word Hunter</span></h1>
+      <p class="subtitle">ขยับตัว ใช้มือแตะคำศัพท์ผ่านกล้อง AI แบบเรียลไทม์ — เลือกโหมดที่จะเล่นด้านล่าง</p>
+
+      <div class="mode-picker">
+        <div class="mode-btn selected" data-mode="quiz" id="btn-mode-quiz">
+          <span class="ico">🖐️</span>เลือกคำแปล<br>(Quiz)
+        </div>
+        <div class="mode-btn" data-mode="touch" id="btn-mode-touch">
+          <span class="ico">🏃</span>วิ่งแตะกรวย<br>(AR Touch)
+        </div>
+      </div>
+
+      <div class="teacher-toggle" id="teacher-toggle">
+        <span>⚙️ ตั้งค่าโหมดครู</span><span id="teacher-caret">▾</span>
+      </div>
+      <div class="teacher-panel" id="teacher-panel">
+        <div class="field">
+          <label><span>จำนวนจุดคำศัพท์/กรวย (ใช้กับโหมด AR Touch)</span><span id="lbl-numtargets">6</span></label>
+          <input type="range" id="in-numtargets" min="2" max="10" value="6">
+        </div>
+        <div class="field">
+          <label>สีกรอบคำศัพท์ / กรอบเป้า</label>
+          <input type="color" id="in-color" value="#00E6C3">
+        </div>
+        <div class="field">
+          <label><span>เวลาแข่งขัน (วินาที)</span></label>
+          <input type="number" id="in-time" min="20" max="180" value="60">
+        </div>
+        <div class="checkline">
+          <input type="checkbox" id="in-mouse-mode">
+          <label for="in-mouse-mode">โหมดทดสอบด้วยเมาส์ (ไม่ใช้กล้อง) — สำหรับทดสอบบนคอมครู</label>
+        </div>
+      </div>
+
+      <div class="name-field">
+        <label for="in-playername">ชื่อผู้เล่น</label>
+        <input type="text" id="in-playername" placeholder="พิมพ์ชื่อของนักเรียน" maxlength="24">
+      </div>
+
+      <button class="btn btn-primary" id="btn-start" style="margin-top:18px;">🎮 เริ่มเกม</button>
+      <p class="cam-note" id="start-note">เกมนี้ต้องขออนุญาตใช้กล้องเพื่อตรวจจับมือ — กรุณากด "อนุญาต" เมื่อเบราว์เซอร์ถาม</p>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: CALIBRATE (AR touch mode only) ============ -->
+  <div class="screen" id="screen-calibrate">
+    <div class="bg-rings"><span></span><span></span><span></span><span></span></div>
+    <div class="stage-wrap">
+      <h3 style="margin-bottom:10px; text-align:center; transform:none;">📍 ตั้งตำแหน่งกรวย</h3>
+      <div class="stage" id="calib-stage">
+        <video id="calib-video" autoplay playsinline muted></video>
+        <canvas id="calib-canvas"></canvas>
+        <div class="calib-count" id="calib-count">0 / 6</div>
+        <div class="stage-hint">แตะ/คลิกบนตำแหน่งกรวยแต่ละอันในภาพ ให้ครบตามจำนวนที่ตั้งไว้</div>
+      </div>
+      <div class="calib-controls">
+        <button class="btn btn-secondary" id="btn-calib-reset">↺ เริ่มใหม่</button>
+        <button class="btn btn-primary" id="btn-calib-confirm" disabled>✅ ยืนยันตำแหน่ง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: COUNTDOWN ============ -->
+  <div class="screen" id="screen-countdown">
+    <div class="bg-rings"><span></span><span></span><span></span><span></span></div>
+    <div class="countdown-num" id="countdown-num">3</div>
+  </div>
+
+  <!-- ============ SCREEN: GAME ============ -->
+  <div class="screen" id="screen-game">
+    <div class="stage-wrap">
+      <div class="stage" id="game-stage">
+        <video id="game-video" autoplay playsinline muted></video>
+        <canvas id="game-canvas"></canvas>
+
+        <div class="hud-top">
+          <div class="hud-score"><div class="val" id="hud-score">0</div><div class="lbl">คะแนน</div></div>
+          <div class="hud-hits"><div class="val" id="hud-hits">0</div><div class="lbl">แตะสำเร็จ</div></div>
+          <div class="hud-timer" id="hud-timer-box"><div class="val" id="hud-timer">60</div><div class="lbl">วินาที</div></div>
+        </div>
+
+        <div class="bonus-banner" id="bonus-banner">🎉 BONUS ROUND! START · แตะให้ทัน!</div>
+
+        <!-- quiz-mode elements (created/positioned via JS) -->
+        <div class="quiz-question" id="quiz-question" style="display:none;">
+          <div class="cn" id="quiz-word">Direction</div>
+          <div class="qtimer" id="quiz-qtimer">10s</div>
+        </div>
+        <div class="answer-zone zone-a" id="zone-0" style="display:none;"><span class="progress" id="zone-0-p"></span><span id="zone-0-text"></span></div>
+        <div class="answer-zone zone-b" id="zone-1" style="display:none;"><span class="progress" id="zone-1-p"></span><span id="zone-1-text"></span></div>
+        <div class="answer-zone zone-c" id="zone-2" style="display:none;"><span class="progress" id="zone-2-p"></span><span id="zone-2-text"></span></div>
+
+        <!-- touch-mode target rings container -->
+        <div id="touch-targets"></div>
+
+        <div class="flash-effect good" id="flash-good">✅ Correct! Great job 👍🏻</div>
+        <div class="flash-effect bad" id="flash-bad">❌ Not quite, try again!</div>
+
+        <!-- pointer dots injected by JS -->
+        <div id="pointer-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: END ============ -->
+  <div class="screen" id="screen-end">
+    <div class="bg-rings"><span></span><span></span><span></span><span></span></div>
+    <div class="card">
+      <span class="title-eyebrow">สรุปผล</span>
+      <h1 class="title-main">เก่งมาก! 🏆</h1>
+      <div class="results-grid">
+        <div class="result-box"><div class="val" id="end-score">0</div><div class="lbl">🏆 คะแนนรวม</div></div>
+        <div class="result-box"><div class="val" id="end-hits">0</div><div class="lbl">🏃 แตะสำเร็จ</div></div>
+        <div class="result-box"><div class="val" id="end-avg">0.0s</div><div class="lbl">⚡ เวลาเฉลี่ย/ครั้ง</div></div>
+      </div>
+      <h3 style="font-size:14px; color:var(--dim); margin-bottom:6px;">🥇 Top 10 คะแนนสูงสุด</h3>
+      <div class="leaderboard" id="leaderboard"></div>
+      <button class="btn btn-primary" id="btn-again" style="margin-top:18px;">🔄 เล่นอีกครั้ง</button>
+      <button class="btn btn-ghost" id="btn-home">กลับหน้าแรก</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MediaPipe Hands (runs entirely client-side in the player's browser) -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+/* ==================================================================
+   1) CONFIG & VOCAB DATA
+   ================================================================== */
+const VOCAB = [
+  {en:"Direction", th:"ทิศทาง"}, {en:"North", th:"ทิศเหนือ"}, {en:"South", th:"ทิศใต้"},
+  {en:"West", th:"ทิศตะวันตก"}, {en:"East", th:"ทิศตะวันออก"}, {en:"Front", th:"ด้านหน้า"},
+  {en:"Back", th:"ด้านหลัง"}, {en:"Left", th:"ด้านซ้าย"}, {en:"Right", th:"ด้านขวา"},
+  {en:"Inside", th:"ด้านใน"}, {en:"Outside", th:"ด้านนอก"}, {en:"Away from", th:"ห่าง"},
+  {en:"Far", th:"ไกล"}, {en:"Near", th:"ใกล้"}, {en:"Middle", th:"ตรงกลาง"},
+  {en:"Meter", th:"เมตร"}, {en:"Straight ahead", th:"ตรงไป"}, {en:"Toward", th:"ไปทาง"},
+  {en:"Traffic light", th:"สัญญาณไฟจราจร"}, {en:"Turn", th:"เลี้ยว"}, {en:"Crosswalk", th:"ทางม้าลาย"},
+  {en:"After that", th:"หลังจากนั้น"}, {en:"Excuse me", th:"สอบถามหน่อย"}, {en:"Peace", th:"สันติภาพ"},
+  {en:"Square", th:"ลานกว้าง"}, {en:"White", th:"สีขาว"}
+];
+
+// TODO: ใส่ URL ของ Google Apps Script Web App ตรงนี้ เพื่อบันทึกคะแนนถาวรลง Google Sheets
+// (ตอนนี้ยังว่าง -> ระบบจะเก็บ Top 10 แบบชั่วคราวในหน่วยความจำของหน้านี้เท่านั้น จะหายไปเมื่อรีเฟรชหน้า)
+const LEADERBOARD_ENDPOINT = "";
+
+/* ==================================================================
+   2) STATE
+   ================================================================== */
+const S = {
+  mode: 'quiz',                 // 'quiz' | 'touch'
+  numTargets: 6,
+  zoneColor: '#00E6C3',
+  gameTime: 60,
+  mouseMode: false,
+  playerName: '',
+
+  score: 0,
+  hits: 0,
+  hitTimes: [],                 // reaction times (ms) for average calculation
+  roundStartAt: 0,
+
+  timeLeft: 60,
+  timerHandle: null,
+
+  // quiz mode
+  quizRound: 0,
+  quizTotal: 10,
+  quizCorrectIndex: -1,
+  quizLocked: false,
+  zoneProgress: [0,0,0],        // dwell progress 0..1 per zone
+  zoneRects: [null,null,null],
+
+  // touch mode
+  calibPoints: [],              // {xr,yr,label} xr/yr = 0..1 relative to stage
+  activeTargetIdx: -1,
+  targetCooldown: [],           // per-target timestamp cooldown for wrong-hit penalty
+  bonusActive: false,
+  bonusTargetIdx: -1,
+  bonusDeadline: 0,
+  nextBonusAt: 20,
+
+  // pointer tracking
+  points: [],                   // [{x,y}] normalized 0..1, from hands or mouse
+  camera: null,
+  hands: null,
+};
+
+let leaderboardMemory = []; // session fallback if no GAS endpoint configured
+
+/* ==================================================================
+   3) DOM HELPERS
+   ================================================================== */
+const $ = (id) => document.getElementById(id);
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('screen-' + name).classList.add('active');
+}
+
+/* ==================================================================
+   4) START SCREEN LOGIC
+   ================================================================== */
+$('btn-mode-quiz').onclick = () => selectMode('quiz');
+$('btn-mode-touch').onclick = () => selectMode('touch');
+function selectMode(m){
+  S.mode = m;
+  $('btn-mode-quiz').classList.toggle('selected', m === 'quiz');
+  $('btn-mode-touch').classList.toggle('selected', m === 'touch');
+}
+
+$('teacher-toggle').onclick = () => {
+  $('teacher-panel').classList.toggle('open');
+  $('teacher-caret').textContent = $('teacher-panel').classList.contains('open') ? '▴' : '▾';
+};
+$('in-numtargets').oninput = (e) => { $('lbl-numtargets').textContent = e.target.value; };
+
+$('btn-start').onclick = async () => {
+  S.numTargets   = parseInt($('in-numtargets').value, 10);
+  S.zoneColor    = $('in-color').value;
+  S.gameTime     = parseInt($('in-time').value, 10) || 60;
+  S.mouseMode    = $('in-mouse-mode').checked;
+  S.playerName   = ($('in-playername').value || 'ผู้เล่น').trim();
+  S.timeLeft     = S.gameTime;
+
+  document.documentElement.style.setProperty('--zone-color', S.zoneColor);
+
+  $('btn-start').disabled = true;
+  $('btn-start').textContent = 'กำลังเปิดกล้อง...';
+
+  const camOk = S.mouseMode ? false : await setupCamera('calib-video', 'calib-canvas').catch(()=>false);
+  if (!camOk && !S.mouseMode){
+    S.mouseMode = true;
+    $('start-note').textContent = '⚠️ ไม่พบกล้องหรือไม่ได้รับอนุญาต — สลับเป็นโหมดทดสอบด้วยเมาส์แทน';
+  }
+
+  $('btn-start').disabled = false;
+  $('btn-start').textContent = '🎮 เริ่มเกม';
+
+  if (S.mode === 'touch'){
+    startCalibration();
+  } else {
+    startCountdown();
+  }
+};
+
+/* ==================================================================
+   5) CAMERA + HAND TRACKING (MediaPipe Hands)
+   ================================================================== */
+let handsInstance = null;
+let cameraInstance = null;
+let activeVideoEl = null, activeCanvasEl = null;
+
+async function setupCamera(videoId, canvasId){
+  const video = $(videoId);
+  activeVideoEl = video;
+  activeCanvasEl = $(canvasId);
+
+  if (S.mouseMode) { attachMouseTracking(activeCanvasEl.closest('.stage')); return true; }
+
+  try{
+    if (!handsInstance){
+      handsInstance = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+      handsInstance.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+      handsInstance.onResults(onHandsResults);
+    }
+    cameraInstance = new Camera(video, {
+      onFrame: async () => { await handsInstance.send({ image: video }); },
+      width: 640, height: 480
+    });
+    await cameraInstance.start();
+    return true;
+  }catch(err){
+    console.warn('เปิดกล้องไม่สำเร็จ:', err);
+    attachMouseTracking(activeCanvasEl.closest('.stage'));
+    return false;
+  }
+}
+
+function onHandsResults(results){
+  const pts = [];
+  if (results.multiHandLandmarks){
+    for (const hand of results.multiHandLandmarks){
+      const tip = hand[8]; // INDEX_FINGER_TIP
+      pts.push({ x: tip.x, y: tip.y });
+    }
+  }
+  S.points = pts;
+}
+
+function attachMouseTracking(stageEl){
+  if (!stageEl) return;
+  const handler = (e) => {
+    const rect = stageEl.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    // stage is CSS-mirrored (scaleX(-1)), so flip x back to match the normalized coordinate space used elsewhere
+    const xr = 1 - (cx / rect.width);
+    const yr = cy / rect.height;
+    S.points = [{ x: xr, y: yr }];
+  };
+  stageEl.addEventListener('mousemove', handler);
+  stageEl.addEventListener('touchmove', handler, { passive:true });
+  stageEl.addEventListener('touchstart', handler, { passive:true });
+}
+
+/* ==================================================================
+   6) CALIBRATION (AR touch mode)
+   ================================================================== */
+function startCalibration(){
+  S.calibPoints = [];
+  $('calib-count').textContent = `0 / ${S.numTargets}`;
+  $('btn-calib-confirm').disabled = true;
+  document.documentElement.style.setProperty('--zone-color', S.zoneColor);
+  showScreen('calibrate');
+  renderCalibMarkers();
+}
+
+$('calib-stage').addEventListener('click', (e) => {
+  if (S.calibPoints.length >= S.numTargets) return;
+  const rect = $('calib-stage').getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const xr = 1 - (cx / rect.width); // un-mirror since stage is visually flipped
+  const yr = cy / rect.height;
+  S.calibPoints.push({ xr, yr, label: VOCAB[S.calibPoints.length % VOCAB.length] });
+  $('calib-count').textContent = `${S.calibPoints.length} / ${S.numTargets}`;
+  $('btn-calib-confirm').disabled = S.calibPoints.length !== S.numTargets;
+  renderCalibMarkers();
+});
+
+$('btn-calib-reset').onclick = () => {
+  S.calibPoints = [];
+  $('calib-count').textContent = `0 / ${S.numTargets}`;
+  $('btn-calib-confirm').disabled = true;
+  renderCalibMarkers();
+};
+
+$('btn-calib-confirm').onclick = () => { startCountdown(); };
+
+function renderCalibMarkers(){
+  const stage = $('calib-stage');
+  stage.querySelectorAll('.calib-marker').forEach(el => el.remove());
+  const rect = stage.getBoundingClientRect();
+  S.calibPoints.forEach((p, i) => {
+    const m = document.createElement('div');
+    m.className = 'target-ring calib-marker';
+    m.style.setProperty('--zone-color', S.zoneColor);
+    m.style.left = (p.xr * rect.width) + 'px';
+    m.style.top  = (p.yr * rect.height) + 'px';
+    m.innerHTML = `<span style="transform:scaleX(-1); font-family:var(--disp); font-weight:700;">${i+1}</span>`;
+    stage.appendChild(m);
+  });
+}
+
+/* ==================================================================
+   7) COUNTDOWN
+   ================================================================== */
+function startCountdown(){
+  showScreen('countdown');
+  let n = 3;
+  $('countdown-num').textContent = n;
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0){ clearInterval(iv); startGame(); }
+    else { $('countdown-num').textContent = n; }
+  }, 700);
+}
+
+/* ==================================================================
+   8) GAME START / MAIN LOOP
+   ================================================================== */
+async function startGame(){
+  S.score = 0; S.hits = 0; S.hitTimes = [];
+  S.timeLeft = S.gameTime;
+  S.nextBonusAt = 20;
+  S.bonusActive = false;
+  updateHud();
+  showScreen('game');
+
+  document.documentElement.style.setProperty('--zone-color', S.zoneColor);
+
+  // (re)attach camera/mouse tracking onto the game screen's video+canvas
+  await setupCamera('game-video', 'game-canvas');
+
+  if (S.mode === 'quiz'){
+    S.quizRound = 0;
+    ['zone-0','zone-1','zone-2'].forEach(id => $(id).style.display = 'flex');
+    $('quiz-question').style.display = 'block';
+    nextQuizRound();
+  } else {
+    buildTouchTargets();
+  }
+
+  S.timerHandle = setInterval(tickTimer, 1000);
+  requestAnimationFrame(gameLoop);
+}
+
+function tickTimer(){
+  S.timeLeft--;
+  $('hud-timer').textContent = S.timeLeft;
+  $('hud-timer-box').classList.toggle('low', S.timeLeft <= 10);
+
+  if (S.mode === 'touch'){
+    const elapsed = S.gameTime - S.timeLeft;
+    if (!S.bonusActive && elapsed >= S.nextBonusAt){
+      triggerBonusRound();
+      S.nextBonusAt += 20;
+    }
+    if (S.bonusActive && Date.now() > S.bonusDeadline){
+      endBonusRound(false);
+    }
+  }
+
+  if (S.timeLeft <= 0){ endGame(); }
+}
+
+function updateHud(){
+  $('hud-score').textContent = S.score;
+  $('hud-hits').textContent = S.hits;
+  $('hud-timer').textContent = S.timeLeft;
+}
+
+/* main render loop: draws pointer dots + runs hit-testing every frame */
+function gameLoop(){
+  if (!$('screen-game').classList.contains('active')) return;
+  renderPointers();
+  if (S.mode === 'quiz') quizFrameCheck();
+  else touchFrameCheck();
+  requestAnimationFrame(gameLoop);
+}
+
+function renderPointers(){
+  const stage = $('game-stage');
+  const rect = stage.getBoundingClientRect();
+  const container = $('pointer-container');
+  container.innerHTML = '';
+  S.points.forEach(p => {
+    const dot = document.createElement('div');
+    dot.className = 'pointer-dot';
+    dot.style.left = (p.x * rect.width) + 'px';
+    dot.style.top  = (p.y * rect.height) + 'px';
+    container.appendChild(dot);
+  });
+}
+
+/* ==================================================================
+   9) QUIZ MODE
+   ================================================================== */
+function nextQuizRound(){
+  if (S.quizRound >= S.quizTotal){ endGame(); return; }
+  S.quizRound++;
+  S.quizLocked = false;
+  S.zoneProgress = [0,0,0];
+
+  const correct = VOCAB[Math.floor(Math.random()*VOCAB.length)];
+  let wrongs = VOCAB.filter(v => v.th !== correct.th);
+  wrongs = shuffle(wrongs).slice(0,2);
+  const options = shuffle([correct, ...wrongs]);
+  S.quizCorrectIndex = options.findIndex(o => o.th === correct.th);
+  S.quizCorrectItem = correct;
+
+  $('quiz-word').textContent = correct.en;
+  options.forEach((o, i) => {
+    const zone = $('zone-' + i);
+    zone.classList.remove('correct','wrong');
+    $('zone-' + i + '-text').textContent = o.th;
+  });
+
+  S.roundStartAt = Date.now();
+  let qTimeLeft = 10;
+  $('quiz-qtimer').textContent = qTimeLeft + 's';
+  if (S.quizTimerHandle) clearInterval(S.quizTimerHandle);
+  S.quizTimerHandle = setInterval(() => {
+    qTimeLeft--;
+    $('quiz-qtimer').textContent = qTimeLeft + 's';
+    if (qTimeLeft <= 0){
+      clearInterval(S.quizTimerHandle);
+      if (!S.quizLocked) { S.quizLocked = true; setTimeout(nextQuizRound, 400); }
+    }
+  }, 1000);
+}
+
+function quizFrameCheck(){
+  if (S.quizLocked) return;
+  const stage = $('game-stage');
+  const rect = stage.getBoundingClientRect();
+
+  for (let i=0;i<3;i++){
+    const zoneEl = $('zone-' + i);
+    const zr = zoneEl.getBoundingClientRect();
+    // convert zone rect (screen coords) into the same normalized 0..1 space as S.points
+    const left  = 1 - ((zr.right  - rect.left) / rect.width);
+    const right = 1 - ((zr.left   - rect.left) / rect.width);
+    const top   = (zr.top    - rect.top)  / rect.height;
+    const bottom= (zr.bottom - rect.top)  / rect.height;
+
+    const inside = S.points.some(p => p.x >= left && p.x <= right && p.y >= top && p.y <= bottom);
+
+    if (inside){
+      S.zoneProgress[i] = Math.min(1, S.zoneProgress[i] + 0.045);
+      const prog = $('zone-' + i + '-p');
+      prog.style.background = `conic-gradient(var(--yellow) ${S.zoneProgress[i]*360}deg, transparent 0deg)`;
+      prog.style.borderRadius = '16px';
+      prog.style.opacity = '0.55';
+      if (S.zoneProgress[i] >= 1){ lockQuizAnswer(i); return; }
+    } else {
+      S.zoneProgress[i] = Math.max(0, S.zoneProgress[i] - 0.06);
+      $('zone-' + i + '-p').style.opacity = String(S.zoneProgress[i] * 0.55);
+    }
+  }
+}
+
+function lockQuizAnswer(i){
+  S.quizLocked = true;
+  clearInterval(S.quizTimerHandle);
+  const correct = i === S.quizCorrectIndex;
+  const zoneEl = $('zone-' + i);
+  zoneEl.classList.add(correct ? 'correct' : 'wrong');
+
+  const reactionMs = Date.now() - S.roundStartAt;
+  if (correct){
+    S.score += 10; S.hits++; S.hitTimes.push(reactionMs);
+    playFlash('good'); speak(S.quizCorrectItem.en);
+  } else {
+    S.score = Math.max(0, S.score - 5);
+    playFlash('bad');
+  }
+  updateHud();
+  setTimeout(nextQuizRound, 750);
+}
+
+/* ==================================================================
+   10) TOUCH-CONE (AR) MODE
+   ================================================================== */
+function buildTouchTargets(){
+  const container = $('touch-targets');
+  container.innerHTML = '';
+  S.targetCooldown = S.calibPoints.map(()=>0);
+  S.calibPoints.forEach((p, i) => {
+    const ring = document.createElement('div');
+    ring.className = 'target-ring';
+    ring.id = 'target-' + i;
+    ring.style.setProperty('--zone-color', S.zoneColor);
+    container.appendChild(ring);
+
+    const label = document.createElement('div');
+    label.className = 'target-label';
+    label.id = 'target-label-' + i;
+    label.textContent = p.label.en + ' · ' + p.label.th;
+    container.appendChild(label);
+  });
+  positionTouchTargets();
+  S.activeTargetIdx = Math.floor(Math.random() * S.calibPoints.length);
+  refreshActiveTarget();
+}
+
+function positionTouchTargets(){
+  const rect = $('game-stage').getBoundingClientRect();
+  S.calibPoints.forEach((p, i) => {
+    const ring = $('target-' + i);
+    const label = $('target-label-' + i);
+    if (!ring) return;
+    ring.style.left = (p.xr * rect.width) + 'px';
+    ring.style.top  = (p.yr * rect.height) + 'px';
+    label.style.left = (p.xr * rect.width) + 'px';
+    label.style.top  = (p.yr * rect.height) + 'px';
+  });
+}
+
+function refreshActiveTarget(){
+  S.calibPoints.forEach((_, i) => $('target-' + i).classList.remove('active','bonus'));
+  if (S.activeTargetIdx >= 0) $('target-' + S.activeTargetIdx).classList.add('active');
+  S.roundStartAt = Date.now();
+}
+
+function touchFrameCheck(){
+  const rect = $('game-stage').getBoundingClientRect();
+  const now = Date.now();
+
+  S.calibPoints.forEach((p, i) => {
+    const cx = 1 - p.xr; // point coords are in the same un-mirrored 0..1 space as calibration
+    const cy = p.yr;
+    const hit = S.points.some(pt => {
+      const dx = (pt.x - cx) * rect.width;
+      const dy = (pt.y - cy) * rect.height;
+      return Math.sqrt(dx*dx + dy*dy) < 55;
+    });
+    if (!hit) return;
+
+    if (S.bonusActive && i === S.bonusTargetIdx){
+      endBonusRound(true); return;
+    }
+    if (i === S.activeTargetIdx && !S.bonusActive){
+      const reactionMs = now - S.roundStartAt;
+      S.score += 10; S.hits++; S.hitTimes.push(reactionMs);
+      updateHud(); playFlash('good');
+      let next = Math.floor(Math.random() * S.calibPoints.length);
+      if (S.calibPoints.length > 1){ while (next === S.activeTargetIdx) next = Math.floor(Math.random()*S.calibPoints.length); }
+      S.activeTargetIdx = next;
+      refreshActiveTarget();
+    } else if (i !== S.activeTargetIdx && (!S.targetCooldown[i] || now - S.targetCooldown[i] > 800)){
+      S.targetCooldown[i] = now;
+      S.score = Math.max(0, S.score - 5);
+      updateHud(); playFlash('bad');
+    }
+  });
+}
+
+function triggerBonusRound(){
+  S.bonusActive = true;
+  S.bonusTargetIdx = Math.floor(Math.random() * S.calibPoints.length);
+  S.bonusDeadline = Date.now() + 10000;
+  S.calibPoints.forEach((_, i) => $('target-' + i).classList.remove('active','bonus'));
+  $('target-' + S.bonusTargetIdx).classList.add('bonus');
+  $('bonus-banner').classList.add('show');
+}
+
+function endBonusRound(success){
+  $('bonus-banner').classList.remove('show');
+  $('target-' + S.bonusTargetIdx).classList.remove('bonus');
+  if (success){
+    S.score += 50; S.hits++;
+    updateHud(); playFlash('good');
+  }
+  S.bonusActive = false;
+  refreshActiveTarget();
+}
+
+window.addEventListener('resize', () => {
+  if ($('screen-game').classList.contains('active') && S.mode === 'touch') positionTouchTargets();
+});
+
+/* ==================================================================
+   11) EFFECTS / SOUND
+   ================================================================== */
+function playFlash(type){
+  const el = $('flash-' + type);
+  el.classList.remove('play');
+  void el.offsetWidth; // restart animation
+  el.classList.add('play');
+  beep(type === 'good');
+}
+
+let audioCtx = null;
+function beep(happy){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = happy ? 880 : 220;
+    g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.3);
+  }catch(e){ /* audio not available, silently ignore */ }
+}
+
+function speak(text){
+  if (!text || !('speechSynthesis' in window)) return;
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+/* ==================================================================
+   12) END GAME + LEADERBOARD
+   ================================================================== */
+function endGame(){
+  clearInterval(S.timerHandle);
+  clearInterval(S.quizTimerHandle);
+  if (cameraInstance && cameraInstance.stop) cameraInstance.stop();
+
+  $('end-score').textContent = S.score;
+  $('end-hits').textContent = S.hits;
+  const avg = S.hitTimes.length ? (S.hitTimes.reduce((a,b)=>a+b,0) / S.hitTimes.length / 1000) : 0;
+  $('end-avg').textContent = avg.toFixed(1) + 's';
+
+  saveScore(S.playerName, S.score);
+  showScreen('end');
+}
+
+async function saveScore(name, score){
+  leaderboardMemory.push({ name, score, date: new Date().toLocaleDateString('th-TH') });
+  leaderboardMemory.sort((a,b)=>b.score-a.score);
+  leaderboardMemory = leaderboardMemory.slice(0,10);
+  renderLeaderboard(leaderboardMemory);
+
+  if (LEADERBOARD_ENDPOINT){
+    try{
+      await fetch(LEADERBOARD_ENDPOINT, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name, score, date: new Date().toISOString() })
+      });
+      // ถ้าต้องการดึง Top 10 จริงจาก Google Sheets มาแสดงแทน ให้เพิ่ม fetch GET ตรงนี้แล้วเรียก renderLeaderboard(data)
+    }catch(e){ console.warn('บันทึกคะแนนลง Google Sheets ไม่สำเร็จ:', e); }
+  }
+}
+
+function renderLeaderboard(list){
+  const box = $('leaderboard');
+  box.innerHTML = '';
+  list.forEach((row, i) => {
+    const div = document.createElement('div');
+    div.className = 'lb-row';
+    div.innerHTML = `<span class="lb-rank">#${i+1}</span><span class="lb-name">${escapeHtml(row.name)}</span><span class="lb-score">${row.score}</span><span class="lb-date">${row.date}</span>`;
+    box.appendChild(div);
+  });
+  if (!list.length) box.innerHTML = '<div class="lb-row" style="color:var(--dim);">ยังไม่มีคะแนน</div>';
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ==================================================================
+   13) NAVIGATION
+   ================================================================== */
+$('btn-again').onclick = () => {
+  if (S.mode === 'touch') startCalibration();
+  else startCountdown();
+};
+$('btn-home').onclick = () => {
+  if (cameraInstance && cameraInstance.stop) cameraInstance.stop();
+  showScreen('start');
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รอบรู้เรื่อง Loop: ตะลุยภารกิจจับผิด Bug | ว31271 การเขียนโปรแกรมภาษา Python</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
+<style>
+  :root{
+    --navy: #1B2A4A;
+    --navy-deep: #0F1B2D;
+    --gold: #C9A227;
+    --gold-light: #F1D98B;
+    --cream: #F7F5EF;
+    --paper: #FFFFFF;
+    --ink: #232A36;
+    --ink-soft: #5B6472;
+    --line: #E4DFCF;
+    --mono-green: #6EE7B7;
+    --bug-red: #E2574C;
+    --ok: #2E8B57;
+    --radius: 14px;
+    --shadow: 0 10px 30px -12px rgba(15,27,45,.25);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Sarabun', sans-serif;
+    font-size: 17px;
+    line-height:1.7;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{ font-family:'Prompt', sans-serif; }
+  code, .mono, pre{ font-family:'JetBrains Mono', monospace; }
+
+  /* ---------- layout ---------- */
+  .app{ display:flex; min-height:100vh; }
+  .sidebar{
+    width: 268px; flex-shrink:0;
+    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color:#fff; padding: 26px 18px 26px;
+    position: sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom: 6px; }
+  .brand .dot{ width:12px;height:12px;border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px rgba(201,162,39,.25); }
+  .brand span{ font-family:'Prompt'; font-weight:700; letter-spacing:.03em; font-size:14px; color: var(--gold-light); text-transform:uppercase; }
+  .sidebar h1{
+    font-size: 22px; line-height:1.35; margin: 10px 0 4px; color:#fff; font-weight:700;
+  }
+  .sidebar .meta{ font-size:13px; color:#AAB6CC; margin-bottom:22px; }
+  .navlist{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+  .navlist button{
+    all:unset; cursor:pointer; display:flex; align-items:center; gap:10px;
+    padding:11px 12px; border-radius:10px; color:#C9D2E3; font-size:15px;
+    transition: background .15s, color .15s; width:100%;
+  }
+  .navlist button .num{
+    width:24px; height:24px; border-radius:7px; background:rgba(255,255,255,.08);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-family:'JetBrains Mono'; flex-shrink:0;
+    color:#9FB0CB;
+  }
+  .navlist button:hover{ background: rgba(255,255,255,.06); color:#fff; }
+  .navlist button.active{ background: var(--gold); color: var(--navy-deep); font-weight:700; }
+  .navlist button.active .num{ background: rgba(15,27,45,.18); color:var(--navy-deep); }
+  .navlist button.done .num::after{ content:"✓"; }
+  .navlist button.done .num{ background: rgba(110,231,183,.18); color: var(--mono-green); }
+
+  .sidebar-foot{ margin-top:26px; padding-top:16px; border-top:1px solid rgba(255,255,255,.12); font-size:12.5px; color:#8C99B3; }
+
+  .main{ flex:1; padding: 44px 56px 90px; max-width: 980px; }
+  .section{ display:none; animation: fade .35s ease; }
+  .section.active{ display:block; }
+  @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .eyebrow{ display:inline-flex; align-items:center; gap:8px; background:var(--navy); color:var(--gold-light); font-family:'Prompt'; font-weight:600; font-size:12.5px; padding:6px 14px; border-radius:999px; letter-spacing:.04em; margin-bottom:16px; }
+  .section h2{ font-size: 30px; color: var(--navy); margin:0 0 10px; font-weight:700; }
+  .section .sub{ color: var(--ink-soft); font-size:16px; margin-bottom: 28px; max-width: 640px; }
+
+  .card{ background:var(--paper); border:1px solid var(--line); border-radius: var(--radius); padding:26px; box-shadow: var(--shadow); margin-bottom:22px; }
+  .card h3{ margin-top:0; color:var(--navy); font-size:19px; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width: 760px){ .grid2{grid-template-columns:1fr;} }
+
+  /* code / terminal block */
+  .terminal{
+    background: var(--navy-deep); border-radius: 12px; overflow:hidden; box-shadow: var(--shadow);
+    border: 1px solid #223351;
+  }
+  .terminal .bar{ display:flex; align-items:center; gap:8px; padding:10px 14px; background:#132038; border-bottom:1px solid #223351; }
+  .terminal .bar .tdot{ width:10px; height:10px; border-radius:50%; }
+  .terminal .bar .tdot.r{background:#E2574C;} .terminal .bar .tdot.y{background:#E7B93E;} .terminal .bar .tdot.g{background:#2EBF71;}
+  .terminal .bar .fname{ margin-left:8px; color:#7E8BA8; font-family:'JetBrains Mono'; font-size:12.5px; }
+  .terminal pre{ margin:0; padding: 18px 20px; color:#D9E2F3; font-size:15px; line-height:1.85; overflow-x:auto; }
+  .terminal .ln{ color:#4C5A78; display:inline-block; width:24px; user-select:none; }
+  .kw{ color:#79B8FF; } .fn{ color:#B392F0; } .num{ color:var(--mono-green); } .str{ color:#F7C36B; } .cm{ color:#6B7A99; font-style:italic;}
+  .buggyline{ background: rgba(226,87,76,.18); display:block; border-left:3px solid var(--bug-red); margin-left:-20px; padding-left:17px; }
+
+  /* buttons */
+  .btn{
+    all:unset; cursor:pointer; font-family:'Prompt'; font-weight:600; font-size:15px;
+    padding:12px 22px; border-radius:10px; display:inline-flex; align-items:center; gap:8px;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .btn:active{ transform: scale(.97); }
+  .btn-primary{ background: var(--gold); color: var(--navy-deep); }
+  .btn-primary:hover{ box-shadow: 0 6px 18px -6px rgba(201,162,39,.6); }
+  .btn-outline{ background:transparent; border:1.5px solid var(--navy); color:var(--navy); }
+  .btn-outline:hover{ background: var(--navy); color:#fff; }
+  .btn-ghost{ background: var(--cream); color:var(--navy); border:1px solid var(--line); }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+
+  /* recap quiz */
+  .quiz-q{ margin-bottom:22px; }
+  .quiz-q p.qtext{ font-weight:600; color:var(--navy); margin-bottom:10px; }
+  .opts{ display:flex; flex-direction:column; gap:8px; }
+  .opt{
+    border:1.5px solid var(--line); border-radius:10px; padding:12px 16px; cursor:pointer;
+    background:var(--paper); transition:.15s; display:flex; align-items:center; gap:10px;
+  }
+  .opt:hover{ border-color: var(--gold); background:#FFFBF0; }
+  .opt.correct{ border-color: var(--ok); background:#EAF7EF; }
+  .opt.wrong{ border-color: var(--bug-red); background:#FDECEA; }
+  .opt .letter{ width:26px; height:26px; border-radius:50%; background:var(--navy); color:#fff; font-family:'JetBrains Mono'; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  table.cheat{ width:100%; border-collapse:collapse; }
+  table.cheat th{ background:var(--navy); color:#fff; text-align:right; padding:10px 14px; font-family:'Prompt'; font-size:14px; }
+  table.cheat td{ padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top; font-size:15.5px; }
+  table.cheat tr:nth-child(even) td{ background:#FBFAF6; }
+
+  .badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:12.5px; font-family:'Prompt'; font-weight:600; }
+  .badge-red{ background:#FDECEA; color:var(--bug-red); }
+  .badge-navy{ background:#EAF0FB; color:var(--navy); }
+
+  /* game */
+  .game-top{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom: 18px; }
+  .stat{ background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:10px 18px; text-align:center; min-width:96px; }
+  .stat b{ display:block; font-family:'Prompt'; font-size:22px; color:var(--navy); }
+  .stat span{ font-size:12px; color:var(--ink-soft); }
+  .stats-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .progress-track{ height:8px; background:#E9E4D2; border-radius:999px; overflow:hidden; margin: 14px 0 26px; }
+  .progress-fill{ height:100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius:999px; transition: width .4s ease; }
+
+  .start-screen{ text-align:center; padding: 46px 20px; }
+  .start-screen .bugicon{ font-size:52px; }
+  .teaminput{ margin: 22px auto 0; max-width:340px; display:flex; gap:10px; }
+  .teaminput input{
+    flex:1; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line); font-family:'Sarabun'; font-size:16px;
+  }
+
+  .hint-box{ margin-top:14px; background:#FFF7E0; border:1px dashed var(--gold); border-radius:10px; padding:12px 16px; font-size:14.5px; color:#7A5E00; display:none;}
+  .hint-box.show{ display:block; }
+
+  footer.pagefoot{ margin-top:60px; padding-top:20px; border-top:1px solid var(--line); color:var(--ink-soft); font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+
+  .reflect textarea{
+    width:100%; min-height:120px; border-radius:10px; border:1.5px solid var(--line); padding:14px; font-family:'Sarabun'; font-size:16px; resize:vertical;
+  }
+  .reflect .field{ margin-bottom:12px; }
+  .reflect .field label{ display:block; font-size:13.5px; color:var(--ink-soft); margin-bottom:5px; font-weight:600; }
+  .reflect .field input{ width:100%; padding:10px 13px; border-radius:9px; border:1.5px solid var(--line); font-family:'Sarabun'; font-size:15px; }
+  .reflect .row3{ display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; }
+  @media (max-width:560px){ .reflect .row3{ grid-template-columns:1fr; } }
+  .badge-save{ display:inline-block; padding:6px 14px; border-radius:999px; font-family:'Prompt'; font-weight:600; font-size:12.5px; margin-top:10px; }
+  .save-ok{ background:#EAF7EF; color:var(--ok, #2E8B57); }
+  .save-fail{ background:#FDECEA; color:#E2574C; }
+  .save-pending{ background:#FFF7E0; color:#8A6D00; }
+
+  @media (max-width: 900px){
+    .app{ flex-direction:column; }
+    .sidebar{ width:100%; height:auto; position:relative; }
+    .main{ padding: 28px 20px 70px; }
+  }
+
+  /* ---------- print button ---------- */
+  .print-fab{
+    position: fixed; top:18px; right:18px; z-index:60;
+    background: var(--gold); color: var(--navy-deep); font-family:'Prompt'; font-weight:700; font-size:14px;
+    border:none; border-radius:999px; padding:11px 20px; cursor:pointer; box-shadow: var(--shadow);
+    display:flex; align-items:center; gap:8px;
+  }
+  .print-fab:hover{ filter:brightness(1.05); }
+
+  .print-only{ display:none; }
+  .print-answer{ display:none; }
+
+  /* ---------- print stylesheet ---------- */
+  @media print{
+    @page{ size:A4; margin: 16mm 14mm; }
+    body{ background:#fff; font-size:13px; }
+    .print-fab, .sidebar, .btn, .teaminput, .hint-box, #gameStart, #gameBody, #gameResult, #leaderboardCard{ display:none !important; }
+    .app{ display:block; }
+    .main{ padding:0; max-width:100%; }
+    .section{ display:block !important; page-break-after: always; }
+    .section:last-of-type{ page-break-after:auto; }
+    .card{ box-shadow:none; border:1px solid #ccc; break-inside: avoid; }
+    .eyebrow{ background:#eee; color:#333; }
+    .terminal{ background:#fff; border:1px solid #999; box-shadow:none; break-inside: avoid; }
+    .terminal .bar{ background:#f0f0f0; border-bottom:1px solid #ccc; }
+    .terminal .bar .fname{ color:#555; }
+    .terminal pre{ color:#111; }
+    .kw{ color:#00539C; } .fn{ color:#6f42c1; } .num{ color:#127a3e; } .str{ color:#a15c00; } .cm{ color:#777; }
+    .buggyline{ background:#fdecea; border-left:3px solid #c0392b; }
+    .print-only{ display:block !important; }
+    .print-answer{ display:inline-block !important; margin-top:8px; font-size:12.5px; font-weight:700; color:#127a3e; }
+    table.cheat th{ background:#eee; color:#111; }
+    footer.pagefoot{ display:none; }
+    .reflect textarea{ border:1px solid #999; min-height:80px; }
+  }
+</style>
+</head>
+<body>
+<button class="print-fab" onclick="window.print()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><span>ว31271 · Python</span></div>
+    <h1>รอบรู้เรื่อง Loop<br>ตะลุยภารกิจจับผิด Bug</h1>
+    <div class="meta">แผนการจัดการเรียนรู้ที่ 1 · หน่วย Control Flow</div>
+
+    <ul class="navlist" id="navlist">
+      <li><button data-target="s0" class="active"><span class="num">0</span> หน้าปกบทเรียน</button></li>
+      <li><button data-target="s1"><span class="num">1</span> ทบทวนความรู้เดิม</button></li>
+      <li><button data-target="s2"><span class="num">2</span> ทำความรู้จัก while</button></li>
+      <li><button data-target="s3"><span class="num">3</span> คลังจับผิดสุดฮิต</button></li>
+      <li><button data-target="s4"><span class="num">4</span> ใบกิจกรรมที่ 1</button></li>
+      <li><button data-target="s5"><span class="num">5</span> 🐞 เกม Bug Hunter</button></li>
+      <li><button data-target="s6"><span class="num">6</span> สรุป &amp; สะท้อนคิด</button></li>
+    </ul>
+
+    <div class="sidebar-foot">
+      ผู้สอน: นายสุทธิเดช ไกรนรา<br>
+      โรงเรียนศึกษานารี · sutdet.com
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- 0: COVER -->
+    <section class="section active" id="s0">
+      <div class="eyebrow">แผนการจัดการเรียนรู้ที่ 1 · เวลา 55 นาที</div>
+      <h2>รอบรู้เรื่อง Loop: ตะลุยภารกิจจับผิด Bug</h2>
+      <p class="sub">โครงสร้างการควบคุมทิศทางแบบวนซ้ำด้วยคำสั่ง <code>while</code> ในภาษา Python — เว็บไซต์นี้เป็นสื่อประกอบการเรียนรู้ตามวัฏจักร 5E ที่ผู้สอนพัฒนาขึ้นเอง ใช้คู่กับแผนการจัดการเรียนรู้ที่ 1</p>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>🎯 จุดประสงค์การเรียนรู้</h3>
+          <ul style="padding-right:0;padding-left:18px; margin:0;">
+            <li>อธิบายโครงสร้างและหลักการทำงานของ <code>while</code> ได้</li>
+            <li>เขียนโปรแกรมโดยใช้ <code>while</code> เพื่อแก้ปัญหาที่กำหนดได้</li>
+            <li>ตรวจสอบและแก้ไขข้อผิดพลาด (Debug) ได้อย่างเป็นระบบ</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🗺️ เส้นทางการเรียนรู้วันนี้</h3>
+          <ul style="padding-right:0;padding-left:18px; margin:0;">
+            <li>ทบทวนความรู้เดิม (if-else / for)</li>
+            <li>เรียนรู้โครงสร้าง <code>while</code> + ข้อผิดพลาดยอดฮิต</li>
+            <li>ลงมือเขียนโค้ดในใบกิจกรรมที่ 1</li>
+            <li><b>แข่งขันเกม Bug Hunter</b> ล่าบั๊กที่ซ่อนอยู่ 5 ภารกิจ</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div>
+          <h3 style="margin-bottom:4px;">พร้อมแล้วหรือยัง?</h3>
+          <p style="margin:0; color:var(--ink-soft);">เริ่มจากการทบทวนความรู้เดิมกันก่อนเลย</p>
+        </div>
+        <button class="btn btn-primary" onclick="goTo('s1')">เริ่มเรียนรู้ →</button>
+      </div>
+    </section>
+
+    <!-- 1: RECAP QUIZ -->
+    <section class="section" id="s1">
+      <div class="eyebrow">ขั้นที่ 1 · สร้างความสนใจ</div>
+      <h2>ทบทวนความรู้เดิม</h2>
+      <p class="sub">ก่อนเข้าสู่เรื่องใหม่ ลองทายผลลัพธ์ของโค้ดที่เคยเรียนผ่านมาแล้วกันก่อน</p>
+
+      <div class="card quiz-q" id="q1">
+        <p class="qtext">1) โค้ดนี้ใช้โครงสร้างควบคุมแบบใด?</p>
+        <div class="terminal" style="margin-bottom:14px;">
+          <div class="bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="fname">recap1.py</span></div>
+          <pre><span class="ln">1</span><span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">5</span>):
+<span class="ln">2</span>    <span class="fn">print</span>(i)</pre>
+        </div>
+        <div class="opts" data-answer="1">
+          <div class="opt" data-idx="0"><span class="letter">A</span> คำสั่งเลือกทำ (if-else)</div>
+          <div class="opt" data-idx="1"><span class="letter">B</span> คำสั่งวนซ้ำแบบกำหนดจำนวนรอบ (for)</div>
+          <div class="opt" data-idx="2"><span class="letter">C</span> คำสั่งวนซ้ำแบบมีเงื่อนไข (while)</div>
+          <div class="opt" data-idx="3"><span class="letter">D</span> คำสั่งรับค่าจากผู้ใช้</div>
+        </div>
+        <div class="print-answer"></div>
+      </div>
+
+      <div class="card quiz-q" id="q2">
+        <p class="qtext">2) จากโค้ดต่อไปนี้ เงื่อนไข <code>score &gt;= 50</code> จะทำงานอย่างไร?</p>
+        <div class="terminal" style="margin-bottom:14px;">
+          <div class="bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="fname">recap2.py</span></div>
+          <pre><span class="ln">1</span>score = <span class="num">65</span>
+<span class="ln">2</span><span class="kw">if</span> score >= <span class="num">50</span>:
+<span class="ln">3</span>    <span class="fn">print</span>(<span class="str">"ผ่าน"</span>)
+<span class="ln">4</span><span class="kw">else</span>:
+<span class="ln">5</span>    <span class="fn">print</span>(<span class="str">"ไม่ผ่าน"</span>)</pre>
+        </div>
+        <div class="opts" data-answer="1">
+          <div class="opt" data-idx="0"><span class="letter">A</span> พิมพ์ "ไม่ผ่าน" เพราะ 65 น้อยกว่า 50</div>
+          <div class="opt" data-idx="1"><span class="letter">B</span> พิมพ์ "ผ่าน" เพราะ 65 มากกว่าหรือเท่ากับ 50</div>
+          <div class="opt" data-idx="2"><span class="letter">C</span> เกิดข้อผิดพลาด เพราะเขียนเงื่อนไขผิด</div>
+          <div class="opt" data-idx="3"><span class="letter">D</span> พิมพ์ทั้งสองบรรทัด</div>
+        </div>
+        <div class="print-answer"></div>
+      </div>
+
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:var(--ink-soft); font-size:14px;">ทบทวนเสร็จแล้ว ไปทำแบบทดสอบก่อนเรียนบน Google Form ที่ครูแจ้งไว้ แล้วไปต่อกันเลย</span>
+        <button class="btn btn-primary" onclick="goTo('s2')">ไปเรียนเรื่อง while →</button>
+      </div>
+    </section>
+
+    <!-- 2: WHILE CONTENT -->
+    <section class="section" id="s2">
+      <div class="eyebrow">ขั้นที่ 2 · สำรวจและค้นหา</div>
+      <h2>ทำความรู้จัก while loop</h2>
+      <p class="sub"><code>while</code> คือคำสั่งที่ทำงาน<b>ซ้ำไปเรื่อย ๆ ตราบใดที่เงื่อนไขยังเป็นจริง</b> ต่างจาก <code>for</code> ที่กำหนดจำนวนรอบไว้ล่วงหน้า</p>
+
+      <div class="card">
+        <h3>โครงสร้างคำสั่ง</h3>
+        <div class="terminal">
+          <div class="bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="fname">structure.py</span></div>
+          <pre><span class="ln">1</span>count = <span class="num">1</span>          <span class="cm"># ① ตั้งค่าเริ่มต้น</span>
+<span class="ln">2</span><span class="kw">while</span> count <= <span class="num">5</span>: <span class="cm"># ② เงื่อนไข — เป็นจริงจึงวนต่อ</span>
+<span class="ln">3</span>    <span class="fn">print</span>(count) <span class="cm"># ③ คำสั่งที่ทำซ้ำ</span>
+<span class="ln">4</span>    count += <span class="num">1</span>     <span class="cm"># ④ เปลี่ยนค่าตัวแปร (ขาดไม่ได้!)</span></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>ทดลองไล่ค่าไปทีละรอบ (Trace Table)</h3>
+        <p style="color:var(--ink-soft); margin-top:-6px;">กดปุ่มเพื่อดูว่าตัวแปร <code>count</code> เปลี่ยนแปลงอย่างไรในแต่ละรอบ</p>
+        <div id="traceOut" class="stats-row" style="margin:14px 0;"></div>
+        <button class="btn btn-outline" onclick="runTrace()">▶ เริ่มไล่ค่าใหม่</button>
+      </div>
+
+      <div class="card" style="display:flex; justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="goTo('s3')">ดูข้อผิดพลาดยอดฮิต →</button>
+      </div>
+    </section>
+
+    <!-- 3: COMMON BUGS -->
+    <section class="section" id="s3">
+      <div class="eyebrow">สาระการเรียนรู้เสริม</div>
+      <h2>คลังจับผิดสุดฮิต</h2>
+      <p class="sub">ก่อนไปแข่งขันในเกม Bug Hunter มาทำความรู้จักข้อผิดพลาดที่นักเขียนโปรแกรมมือใหม่พบบ่อยที่สุดกันก่อน</p>
+
+      <div class="card">
+        <table class="cheat">
+          <tr><th style="text-align:right;">อาการ</th><th style="text-align:right;">สาเหตุที่พบบ่อย</th><th style="text-align:right;">วิธีแก้</th></tr>
+          <tr><td><span class="badge badge-red">Infinite Loop</span> โปรแกรมค้าง ไม่หยุดวนซ้ำ</td><td>ลืมเปลี่ยนค่าตัวแปรที่ใช้ในเงื่อนไข</td><td>ตรวจสอบทุกครั้งว่ามีคำสั่งเพิ่ม/ลดค่าตัวแปรอยู่ใน loop</td></tr>
+          <tr><td><span class="badge badge-navy">SyntaxError</span> โปรแกรมรันไม่ได้</td><td>ลืมใส่เครื่องหมาย <code>:</code> ท้ายเงื่อนไข</td><td>ตรวจการใช้ <code>:</code> หลัง while เสมอ</td></tr>
+          <tr><td><span class="badge badge-navy">IndentationError</span> / ทำงานผิดจังหวะ</td><td>คำสั่งภายใน loop เยื้องไม่ตรงกัน</td><td>จัดย่อหน้า (indent) ให้สม่ำเสมอ 4 ช่องเสมอ</td></tr>
+          <tr><td><span class="badge badge-red">วนซ้ำเกิน/ขาด</span> ผลลัพธ์ไม่ตรงตามต้องการ</td><td>ใช้ <code>!=</code> แล้วค่าตัวแปรกระโดดข้ามค่าที่ต้องการพอดี</td><td>ใช้ <code>&lt;</code> หรือ <code>&lt;=</code> แทน <code>!=</code> เมื่อไม่แน่ใจว่าค่าจะตรงพอดี</td></tr>
+        </table>
+      </div>
+
+      <div class="card" style="display:flex; justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="goTo('s4')">ไปทำใบกิจกรรมที่ 1 →</button>
+      </div>
+    </section>
+
+    <!-- 4: ACTIVITY SHEET -->
+    <section class="section" id="s4">
+      <div class="eyebrow">ขั้นที่ 2 · ลงมือปฏิบัติ · กลุ่มละ 3-4 คน</div>
+      <h2>ใบกิจกรรมที่ 1: เขียนคำสั่ง while เบื้องต้น</h2>
+      <p class="sub">เปิด Google Colab ของกลุ่มตนเอง แล้วเขียนโค้ดตามโจทย์ต่อไปนี้ให้ครบทั้ง 3 ข้อ</p>
+
+      <div class="card">
+        <h3>โจทย์ที่ 1 — นับถอยหลัง</h3>
+        <p>เขียนโปรแกรมพิมพ์เลข 10 ถึง 1 โดยลดค่าทีละ 1 แล้วพิมพ์คำว่า <code>"เริ่ม!"</code> เมื่อจบการนับ</p>
+      </div>
+      <div class="card">
+        <h3>โจทย์ที่ 2 — ผลรวมเลขคู่</h3>
+        <p>เขียนโปรแกรมหาผลรวมของเลขคู่ตั้งแต่ 2 ถึง 20 โดยใช้ <code>while</code></p>
+      </div>
+      <div class="card">
+        <h3>โจทย์ที่ 3 — ทายตัวเลข</h3>
+        <p>กำหนดตัวแปรลับ <code>secret = 7</code> ให้เขียนลูป <code>while</code> ที่ถามผู้ใช้ซ้ำไปเรื่อย ๆ จนกว่าจะทายถูก</p>
+      </div>
+
+      <div class="card" style="background:#FFF7E0; border-color:var(--gold);">
+        <b>💡 คำใบ้:</b> อย่าลืมตรวจสอบว่าทุกลูปของท่านมีทาง "จบ" เสมอ ไม่เช่นนั้นโปรแกรมจะกลายเป็น Infinite Loop เหมือนในหัวข้อที่แล้ว!
+      </div>
+
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:var(--ink-soft); font-size:14px;">ทำเสร็จแล้ว? ให้ตัวแทนกลุ่มเตรียมนำเสนอโค้ดหน้าชั้นเรียน แล้วไปลุยภารกิจล่าบั๊กกันเลย!</span>
+        <button class="btn btn-primary" onclick="goTo('s5')">🐞 ไปเล่นเกม Bug Hunter →</button>
+      </div>
+    </section>
+
+    <!-- 5: BUG HUNTER GAME -->
+    <section class="section" id="s5">
+      <div class="eyebrow">ขั้นที่ 4 · ขยายความรู้ · นวัตกรรมที่ผู้สอนพัฒนาขึ้นเอง</div>
+      <h2>🐞 Bug Hunter: ภารกิจล่าบั๊ก</h2>
+      <p class="sub">แข่งขันเป็นกลุ่ม ค้นหาและแก้ไขข้อผิดพลาดในโค้ด <code>while</code> ทั้งหมด 5 ภารกิจ ยิ่งตอบถูกเร็วยิ่งได้คะแนนมาก!</p>
+
+      <!-- start screen -->
+      <div class="card start-screen" id="gameStart">
+        <div class="bugicon">🐛🔍</div>
+        <h3 style="margin-bottom:6px;">พร้อมล่าบั๊กหรือยัง?</h3>
+        <p style="color:var(--ink-soft); margin:0;">ใส่ชื่อกลุ่มของท่าน แล้วกด "เริ่มภารกิจ" — มีเวลาทั้งหมด 10 นาที และคำใบ้จะปรากฏหลังตอบผิด 2 ครั้ง</p>
+        <div class="teaminput">
+          <input type="text" id="teamName" placeholder="ชื่อกลุ่ม เช่น กลุ่มที่ 1">
+          <button class="btn btn-primary" onclick="startGame()">เริ่มภารกิจ</button>
+        </div>
+      </div>
+
+      <!-- game body -->
+      <div id="gameBody" style="display:none;">
+        <div class="game-top">
+          <div class="stats-row">
+            <div class="stat"><b id="statTeam">-</b><span>ทีม</span></div>
+            <div class="stat"><b id="statScore">0</b><span>คะแนน</span></div>
+            <div class="stat"><b id="statTimer">10:00</b><span>เวลาที่เหลือ</span></div>
+            <div class="stat"><b id="statMission">1/5</b><span>ภารกิจ</span></div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+        <div id="missionArea"></div>
+      </div>
+
+      <!-- result screen -->
+      <div class="card" id="gameResult" style="display:none; text-align:center; padding:40px 20px;">
+        <div style="font-size:46px;">🏆</div>
+        <h3 id="resultTitle">ภารกิจสำเร็จ!</h3>
+        <p id="resultDesc" style="color:var(--ink-soft);"></p>
+        <button class="btn btn-outline" onclick="resetGame()">เล่นใหม่อีกครั้ง</button>
+      </div>
+
+      <div class="card" id="leaderboardCard" style="display:none;">
+        <h3>📋 กระดานผู้นำ (รอบนี้)</h3>
+        <table class="cheat" id="leaderboardTable">
+          <tr><th style="text-align:right;">อันดับ</th><th style="text-align:right;">ทีม</th><th style="text-align:right;">คะแนน</th></tr>
+        </table>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin-top:8px;">* กระดานผู้นำนี้บันทึกเฉพาะระหว่างเปิดหน้าเว็บนี้อยู่เท่านั้น เหมาะสำหรับใช้เปรียบเทียบคะแนนสด ๆ ในคาบเรียน</p>
+      </div>
+
+      <!-- STATIC PRINT VERSION: shown only when printing / exporting to PDF -->
+      <div id="printMissions" class="print-only"></div>
+    </section>
+
+    <!-- 6: SUMMARY / REFLECT -->
+    <section class="section" id="s6">
+      <div class="eyebrow">ขั้นที่ 5 · ประเมินผลการเรียนรู้</div>
+      <h2>สรุปบทเรียน &amp; สะท้อนคิด</h2>
+      <p class="sub">วันนี้เราได้เรียนรู้อะไรกันบ้าง มาสรุปและสะท้อนคิดกันก่อนจบคาบเรียน</p>
+
+      <div class="card">
+        <h3>✅ สรุปสิ่งที่ได้เรียนรู้วันนี้</h3>
+        <ul style="padding-right:0;padding-left:18px; margin:0;">
+          <li><code>while</code> ทำงานซ้ำ ๆ ตราบใดที่เงื่อนไขยังเป็นจริง</li>
+          <li>ทุกลูปต้องมีการเปลี่ยนค่าตัวแปรที่ใช้ในเงื่อนไข ไม่เช่นนั้นจะเกิด Infinite Loop</li>
+          <li>การ Debug อย่างเป็นระบบ คือทักษะสำคัญของนักเขียนโปรแกรมทุกคน</li>
+        </ul>
+      </div>
+
+      <div class="card reflect">
+        <h3>📝 Exit Ticket: สะท้อนคิด</h3>
+        <p style="color:var(--ink-soft); margin-top:-4px;">เขียนสั้น ๆ ว่าท่านได้เรียนรู้อะไร และจะนำไปใช้ประโยชน์อย่างไร คำตอบจะถูกบันทึกลง Google Sheet ให้ครูโดยอัตโนมัติ</p>
+        <div class="row3">
+          <div class="field"><label>ชื่อ-นามสกุล</label><input type="text" id="refName" placeholder="เช่น ด.ช. สมชาย ใจดี"></div>
+          <div class="field"><label>ห้อง</label><input type="text" id="refRoom" placeholder="เช่น ม.4/2"></div>
+          <div class="field"><label>เลขที่</label><input type="text" id="refNumber" placeholder="เช่น 12"></div>
+        </div>
+        <textarea id="refText" placeholder="วันนี้ฉันได้เรียนรู้ว่า..."></textarea>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="submitReflection()">ส่งคำตอบ</button>
+          <span id="refStatus"></span>
+        </div>
+      </div>
+
+      <div class="card" style="background:#EAF0FB;">
+        <b>🎯 การบ้านก่อนคาบหน้า:</b> ศึกษาค้นคว้าล่วงหน้าเรื่อง <code>for loop</code> เพื่อเตรียมพร้อมสำหรับบทเรียนถัดไป
+      </div>
+    </section>
+
+    <footer class="pagefoot">
+      <span>สื่อประกอบการจัดการเรียนรู้ · แผนการจัดการเรียนรู้ที่ 1 · ว31271 การเขียนโปรแกรมภาษา Python</span>
+      <span>นายสุทธิเดช ไกรนรา · โรงเรียนศึกษานารี</span>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+/* ---------------- NAVIGATION ---------------- */
+const navButtons = document.querySelectorAll('.navlist button');
+function goTo(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  navButtons.forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.navlist button[data-target="${id}"]`).classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+navButtons.forEach(b=>b.addEventListener('click', ()=>goTo(b.dataset.target)));
+
+/* ---------------- RECAP QUIZ ---------------- */
+document.querySelectorAll('.quiz-q .opts').forEach(optsEl=>{
+  const answer = optsEl.dataset.answer;
+  optsEl.querySelectorAll('.opt').forEach(opt=>{
+    opt.addEventListener('click', ()=>{
+      if(optsEl.dataset.locked) return;
+      const correct = opt.dataset.idx === answer;
+      optsEl.querySelectorAll('.opt').forEach(o=>o.classList.remove('correct','wrong'));
+      if(correct){
+        opt.classList.add('correct');
+        optsEl.dataset.locked = "1";
+        Swal.fire({icon:'success', title:'ถูกต้อง!', text:'เยี่ยมมาก ไปข้อถัดไปกันเลย', confirmButtonColor:'#1B2A4A', timer:1600, showConfirmButton:false});
+      } else {
+        opt.classList.add('wrong');
+        Swal.fire({icon:'error', title:'ยังไม่ถูกนะ', text:'ลองอีกครั้ง!', confirmButtonColor:'#1B2A4A', timer:1200, showConfirmButton:false});
+      }
+    });
+  });
+});
+
+/* ---------------- TRACE TABLE ---------------- */
+function runTrace(){
+  const out = document.getElementById('traceOut');
+  out.innerHTML = '';
+  let count = 1;
+  let i = 0;
+  const iv = setInterval(()=>{
+    if(count > 5){ clearInterval(iv); return; }
+    const div = document.createElement('div');
+    div.className='stat';
+    div.innerHTML = `<b>${count}</b><span>รอบที่ ${count}</span>`;
+    out.appendChild(div);
+    count++;
+  }, 350);
+}
+
+/* ---------------- BUG HUNTER GAME ---------------- */
+const missions = [
+  {
+    title: "ภารกิจที่ 1: ทำไมโปรแกรมค้าง?",
+    code: [
+      {t:'count = <span class="num">1</span>'},
+      {t:'<span class="kw">while</span> count <= <span class="num">5</span>:', bug:true},
+      {t:'    <span class="fn">print</span>(count)'}
+    ],
+    question: "โค้ดนี้รันแล้วโปรแกรมค้าง (ไม่หยุด) เกิดจากสาเหตุใด?",
+    options: [
+      "ลืมเขียนคำสั่งเพิ่มค่า count ทำให้เงื่อนไขเป็นจริงตลอดไป",
+      "เงื่อนไขต้องใช้ &lt; แทน &lt;=",
+      "ตัวแปร count ตั้งค่าเริ่มต้นผิด ต้องเริ่มที่ 0",
+      "คำสั่ง print เขียนผิดตำแหน่ง"
+    ],
+    answer: 0,
+    hint: "ลองดูว่ามีบรรทัดไหนที่ทำให้ค่า count เปลี่ยนแปลงระหว่างวนซ้ำหรือไม่..."
+  },
+  {
+    title: "ภารกิจที่ 2: ไล่ค่าให้แม่นก่อนแก้บั๊ก",
+    code: [
+      {t:'total = <span class="num">0</span>'},
+      {t:'i = <span class="num">1</span>'},
+      {t:'<span class="kw">while</span> i < <span class="num">10</span>:'},
+      {t:'    total = total + i'},
+      {t:'    i += <span class="num">2</span>'},
+      {t:'<span class="fn">print</span>(total)', bug:true}
+    ],
+    question: "โค้ดนี้ไม่มีบั๊ก แต่ให้ทายว่าค่า total ที่พิมพ์ออกมาคือเท่าไร?",
+    options: ["20", "25", "30", "45"],
+    answer: 1,
+    hint: "ลองไล่ค่า i ทีละรอบ: 1, 3, 5, 7, 9 แล้วนำมาบวกกัน..."
+  },
+  {
+    title: "ภารกิจที่ 3: รันไม่ได้เลย!",
+    code: [
+      {t:'x = <span class="num">10</span>'},
+      {t:'<span class="kw">while</span> x > <span class="num">0</span>', bug:true},
+      {t:'    <span class="fn">print</span>(x)'},
+      {t:'    x -= <span class="num">1</span>'}
+    ],
+    question: "โปรแกรมนี้รันไม่ได้เลย เกิด SyntaxError เพราะเหตุใด?",
+    options: [
+      "ลืมใส่เครื่องหมาย : ท้ายบรรทัดเงื่อนไข while",
+      "ใช้ x -= 1 ไม่ได้ในภาษา Python",
+      "ต้องเขียน print(\"x\") ไม่ใช่ print(x)",
+      "ตัวแปร x ต้องเป็นตัวพิมพ์ใหญ่"
+    ],
+    answer: 0,
+    hint: "สังเกตท้ายบรรทัดที่ 2 ให้ดี ๆ เทียบกับโครงสร้างคำสั่งที่ถูกต้อง..."
+  },
+  {
+    title: "ภารกิจที่ 4: ย่อหน้าผิด ผลลัพธ์ก็ผิด",
+    code: [
+      {t:'n = <span class="num">5</span>'},
+      {t:'<span class="kw">while</span> n > <span class="num">0</span>:'},
+      {t:'    <span class="fn">print</span>(n)'},
+      {t:'n -= <span class="num">1</span>', bug:true}
+    ],
+    question: "โค้ดนี้ทำให้เกิด Infinite Loop เพราะอะไร?",
+    options: [
+      "บรรทัด n -= 1 เยื้องไม่ตรงกับ print จึงไม่ถูกนับว่าอยู่ใน loop",
+      "ต้องใช้ n = n + 1 แทน n -= 1",
+      "เงื่อนไขต้องเป็น n >= 0",
+      "ตัวแปร n ต้องเป็นทศนิยม"
+    ],
+    answer: 0,
+    hint: "สังเกตระยะเยื้อง (indentation) ของบรรทัดสุดท้าย เทียบกับบรรทัด print..."
+  },
+  {
+    title: "ภารกิจที่ 5: ใช้ != แล้วพลาดได้ง่าย ๆ",
+    code: [
+      {t:'num = <span class="num">1</span>'},
+      {t:'<span class="kw">while</span> num != <span class="num">10</span>:', bug:true},
+      {t:'    <span class="fn">print</span>(num)'},
+      {t:'    num += <span class="num">4</span>'}
+    ],
+    question: "โค้ดนี้เกิด Infinite Loop เพราะเหตุใด?",
+    options: [
+      "ค่า num จะเป็น 1, 5, 9, 13, ... ซึ่งไม่มีค่าใดเท่ากับ 10 พอดี เงื่อนไข != จึงเป็นจริงตลอดไป",
+      "ต้องเริ่มต้น num = 0 แทน 1",
+      "คำสั่ง print ต้องอยู่หลัง num += 4",
+      "ค่า 4 ที่เพิ่มต้องเปลี่ยนเป็นจำนวนลบ"
+    ],
+    answer: 0,
+    hint: "ลองไล่ค่า num ทีละรอบ: 1, 5, 9, 13, 17 ... จะมีรอบไหนเท่ากับ 10 พอดีไหม?"
+  }
+];
+
+let gState = { score:0, mission:0, attempts:0, timerId:null, seconds:600, team:"" };
+const leaderboard = [];
+
+function startGame(){
+  const name = document.getElementById('teamName').value.trim();
+  gState.team = name || "ทีมนิรนาม";
+  document.getElementById('gameStart').style.display = 'none';
+  document.getElementById('gameBody').style.display = 'block';
+  document.getElementById('statTeam').textContent = gState.team;
+  gState.score = 0; gState.mission = 0; gState.seconds = 600;
+  updateStats();
+  startTimer();
+  renderMission();
+}
+
+function startTimer(){
+  clearInterval(gState.timerId);
+  gState.timerId = setInterval(()=>{
+    gState.seconds--;
+    const m = Math.floor(gState.seconds/60).toString().padStart(2,'0');
+    const s = (gState.seconds%60).toString().padStart(2,'0');
+    document.getElementById('statTimer').textContent = `${m}:${s}`;
+    if(gState.seconds <= 0){
+      clearInterval(gState.timerId);
+      Swal.fire({icon:'warning', title:'หมดเวลา!', text:'มาดูผลคะแนนที่ทำได้กันเลย', confirmButtonColor:'#1B2A4A'});
+      endGame();
+    }
+  }, 1000);
+}
+
+function updateStats(){
+  document.getElementById('statScore').textContent = gState.score;
+  document.getElementById('statMission').textContent = `${Math.min(gState.mission+1,5)}/5`;
+  document.getElementById('progFill').style.width = `${(gState.mission/5)*100}%`;
+}
+
+function renderMission(){
+  gState.attempts = 0;
+  const m = missions[gState.mission];
+  const area = document.getElementById('missionArea');
+  const codeHtml = m.code.map((line,idx)=>
+    `<span class="ln">${idx+1}</span>${line.bug ? '<span class="buggyline">'+line.t+'</span>' : line.t}`
+  ).join('\n');
+
+  const optHtml = m.options.map((opt,idx)=>
+    `<div class="opt" data-idx="${idx}"><span class="letter">${String.fromCharCode(65+idx)}</span> ${opt}</div>`
+  ).join('');
+
+  area.innerHTML = `
+    <div class="card">
+      <h3>${m.title}</h3>
+      <div class="terminal" style="margin-bottom:16px;">
+        <div class="bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="fname">mission_${gState.mission+1}.py</span></div>
+        <pre>${codeHtml}</pre>
+      </div>
+      <p class="qtext">${m.question}</p>
+      <div class="opts" id="missionOpts">${optHtml}</div>
+      <div class="hint-box" id="hintBox">💡 คำใบ้: ${m.hint}</div>
+    </div>
+  `;
+
+  document.querySelectorAll('#missionOpts .opt').forEach(opt=>{
+    opt.addEventListener('click', ()=>{
+      const idx = parseInt(opt.dataset.idx);
+      if(idx === m.answer){
+        const pts = gState.attempts === 0 ? 20 : gState.attempts === 1 ? 10 : 5;
+        gState.score += pts;
+        opt.classList.add('correct');
+        Swal.fire({
+          icon:'success', title:'จับบั๊กได้แล้ว! 🐞', text:`ได้รับ ${pts} คะแนน`,
+          confirmButtonColor:'#1B2A4A', confirmButtonText:'ภารกิจถัดไป'
+        }).then(()=>{
+          gState.mission++;
+          updateStats();
+          if(gState.mission >= 5){ endGame(); } else { renderMission(); }
+        });
+      } else {
+        gState.attempts++;
+        opt.classList.add('wrong');
+        Swal.fire({icon:'error', title:'ยังไม่ใช่บั๊กตัวนี้', text:'ลองสังเกตโค้ดอีกครั้ง', confirmButtonColor:'#1B2A4A', timer:1400, showConfirmButton:false});
+        if(gState.attempts >= 2){ document.getElementById('hintBox').classList.add('show'); }
+      }
+    });
+  });
+}
+
+function endGame(){
+  clearInterval(gState.timerId);
+  document.getElementById('gameBody').style.display = 'none';
+  document.getElementById('gameResult').style.display = 'block';
+  const s = gState.score;
+  let grade = "ควรฝึกฝนเพิ่มเติม 💪";
+  if(s >= 90) grade = "สุดยอดนักล่าบั๊ก! 🏆";
+  else if(s >= 60) grade = "ดีมาก เกือบสมบูรณ์แบบ! 🌟";
+  else if(s >= 30) grade = "ทำได้ดี ลองอีกนิดจะเก่งมาก 👍";
+  document.getElementById('resultTitle').textContent = `${gState.team}: ${s} คะแนน`;
+  document.getElementById('resultDesc').textContent = grade;
+
+  leaderboard.push({team: gState.team, score: s});
+  leaderboard.sort((a,b)=>b.score - a.score);
+  renderLeaderboard();
+  document.getElementById('leaderboardCard').style.display = 'block';
+}
+
+function renderLeaderboard(){
+  const table = document.getElementById('leaderboardTable');
+  table.innerHTML = '<tr><th style="text-align:right;">อันดับ</th><th style="text-align:right;">ทีม</th><th style="text-align:right;">คะแนน</th></tr>';
+  leaderboard.forEach((row,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="text-align:right;">${i+1}</td><td style="text-align:right;">${row.team}</td><td style="text-align:right;">${row.score}</td>`;
+    table.appendChild(tr);
+  });
+}
+
+function resetGame(){
+  document.getElementById('gameResult').style.display = 'none';
+  document.getElementById('gameStart').style.display = 'block';
+  document.getElementById('teamName').value = '';
+}
+
+/* ---------------- PRINT / PDF VIEW ---------------- */
+function renderPrintAnswers(){
+  document.querySelectorAll('.quiz-q').forEach(q=>{
+    const optsEl = q.querySelector('.opts');
+    const ansIdx = parseInt(optsEl.dataset.answer);
+    const letter = String.fromCharCode(65 + ansIdx);
+    const holder = q.querySelector('.print-answer');
+    if(holder) holder.textContent = `เฉลย: ข้อ ${letter}`;
+  });
+}
+
+function renderPrintMissions(){
+  const wrap = document.getElementById('printMissions');
+  let html = `<div class="card" style="break-inside:avoid;"><h3>🐞 ใบกิจกรรม Bug Hunter: ภารกิจล่าบั๊ก (ฉบับพิมพ์ / เฉลยสำหรับผู้สอน)</h3>
+    <p style="color:var(--ink-soft);">พิมพ์หน้านี้แจกเป็นใบกิจกรรมให้นักเรียนทำบนกระดาษ หรือใช้เป็นเฉลยประกอบการตรวจ</p></div>`;
+
+  missions.forEach((m, mi)=>{
+    const codeHtml = m.code.map((line,idx)=>
+      `<span class="ln">${idx+1}</span>${line.bug ? '<span class="buggyline">'+line.t+'</span>' : line.t}`
+    ).join('\n');
+    const optHtml = m.options.map((opt,idx)=>
+      `<div class="opt" data-idx="${idx}">
+        <span class="letter">${String.fromCharCode(65+idx)}</span> ${opt}
+        ${idx === m.answer ? '<span style="margin-right:auto; color:#127a3e; font-weight:700; font-size:12.5px;">← คำตอบที่ถูกต้อง</span>' : ''}
+      </div>`
+    ).join('');
+
+    html += `
+      <div class="card" style="break-inside:avoid;">
+        <h3>${m.title}</h3>
+        <div class="terminal" style="margin-bottom:14px;">
+          <div class="bar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="fname">mission_${mi+1}.py</span></div>
+          <pre>${codeHtml}</pre>
+        </div>
+        <p class="qtext">${m.question}</p>
+        <div class="opts">${optHtml}</div>
+        <div class="print-answer" style="display:block !important;">💡 คำใบ้: ${m.hint}</div>
+      </div>`;
+  });
+
+  wrap.innerHTML = html;
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  renderPrintAnswers();
+  renderPrintMissions();
+});
+
+/* ================= EXIT TICKET → Google Sheet ================= */
+// วาง URL ของ Google Apps Script Web App (จาก Deploy > New deployment > Web app) แทนที่ค่าด้านล่างนี้
+// URL จะมีรูปแบบ: https://script.google.com/macros/s/XXXXXXXXXXXXXXXX/exec
+const GAS_WEB_APP_URL = "https://script.google.com/a/macros/snr.ac.th/s/AKfycbzwqx24RJ0p0VSMdGD__n3F7dmQCzbRzsVY2Hr4vCJXospu2gcczQnMfMLETefat6lYfQ/exec";
+
+function submitReflection(){
+  const name = document.getElementById('refName').value.trim();
+  const room = document.getElementById('refRoom').value.trim();
+  const number = document.getElementById('refNumber').value.trim();
+  const text = document.getElementById('refText').value.trim();
+  const statusEl = document.getElementById('refStatus');
+
+  if(!name){ Swal.fire({icon:'warning', title:'กรุณากรอกชื่อ-นามสกุล', confirmButtonColor:'#1B2A4A'}); return; }
+  if(!text){ Swal.fire({icon:'warning', title:'กรุณาเขียนข้อความสะท้อนคิดก่อนส่ง', confirmButtonColor:'#1B2A4A'}); return; }
+
+  if(!GAS_WEB_APP_URL || GAS_WEB_APP_URL.indexOf('script.google.com') === -1){
+    statusEl.innerHTML = `<span class="badge-save save-fail">⚠️ ยังไม่ได้ตั้งค่าลิงก์ Google Sheet — ข้อความนี้จะไม่ถูกบันทึก</span>`;
+    return;
+  }
+
+  statusEl.innerHTML = `<span class="badge-save save-pending">⏳ กำลังส่ง...</span>`;
+
+  fetch(GAS_WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // ป้องกัน CORS preflight
+    body: JSON.stringify({
+      action: 'saveReflection',
+      data: { name, room, number, topic: 'while loop', reflectionText: text }
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if(res && res.success){
+      statusEl.innerHTML = `<span class="badge-save save-ok">✅ บันทึกแล้ว ขอบคุณสำหรับการสะท้อนคิด!</span>`;
+      document.getElementById('refText').value = '';
+      Swal.fire({icon:'success', title:'ส่งสำเร็จ!', confirmButtonColor:'#1B2A4A', timer:1500, showConfirmButton:false});
+    } else {
+      statusEl.innerHTML = `<span class="badge-save save-fail">⚠️ บันทึกไม่สำเร็จ: ${(res && res.message) || 'ไม่ทราบสาเหตุ'}</span>`;
+    }
+  })
+  .catch(err => {
+    statusEl.innerHTML = `<span class="badge-save save-fail">⚠️ เชื่อมต่อไม่สำเร็จ: ${err.message}</span>`;
+  });
+}
+</script>
+</body>
+</html>

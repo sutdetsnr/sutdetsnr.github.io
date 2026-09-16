@@ -147,9 +147,18 @@
     </div>
 </div>
 
+<div id="err-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-sm px-4 py-2 shadow-lg"><b>เกิดข้อผิดพลาด:</b> <span id="err-banner-text"></span> <button onclick="this.parentNode.classList.add('hidden')" class="float-right font-bold px-2">✕</button></div>
 <div id="toast" class="toast hidden bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm"></div>
 
 <script>
+/* ================== Global error display (สำหรับมือถือที่ไม่มี console) ================== */
+function showFatal(msg) {
+    var b = document.getElementById('err-banner'), t = document.getElementById('err-banner-text');
+    if (b && t) { t.textContent = msg; b.classList.remove('hidden'); }
+}
+window.addEventListener('error', function (e) { showFatal((e.message || 'Script error') + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '')); });
+window.addEventListener('unhandledrejection', function (e) { showFatal((e.reason && e.reason.message) || String(e.reason)); });
+
 /* ================== Config & State ================== */
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
 // Google Apps Script Web App URL (Deploy: Execute as Me / Who has access: Anyone)
@@ -185,7 +194,7 @@ const el = {
 
 /* ================== Utilities ================== */
 const yieldBrowser = () => new Promise(r => setTimeout(r, 10));
-const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const escapeHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 let toastTimer = null;
 function toast(msg, isError = false) {
@@ -259,6 +268,15 @@ async function ensureModels(statusCb) {
         ]),
         new Promise((_, rej) => setTimeout(() => rej(new Error('โหลดโมเดลไม่สำเร็จใน 45 วินาที กรุณาตรวจสอบอินเทอร์เน็ต')), 45000))
     ]);
+    // เลือก backend: webgl ก่อน ถ้าไม่ได้ (เช่น iPad รุ่นเก่า) ใช้ cpu
+    try {
+        await faceapi.tf.setBackend('webgl');
+        await faceapi.tf.ready();
+    } catch (e) {
+        console.warn('webgl backend failed, fallback to cpu', e);
+        await faceapi.tf.setBackend('cpu');
+        await faceapi.tf.ready();
+    }
     modelsLoaded = true;
 }
 
@@ -446,6 +464,7 @@ async function startCamera() {
         });
         el.video.srcObject = videoStream;
         isCameraRunning = true;
+        try { await el.video.play(); } catch (e) { console.warn('video.play()', e); }
         el.btnStart.classList.add('hidden'); el.btnStop.classList.remove('hidden'); el.placeholder.classList.add('hidden');
     } catch (err) {
         console.error('Camera Error:', err);
@@ -471,10 +490,13 @@ function stopCamera() {
 async function onVideoPlay() {
     if (!faceMatcher || !isCameraRunning) return;
     const ctx = el.canvas.getContext('2d');
-    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: isMobile ? 160 : 224, scoreThreshold: 0.5 });
 
     async function scanFrame() {
         if (el.video.paused || el.video.ended || !isCameraRunning) return;
+        // รอให้วิดีโอมีภาพจริงก่อน (iOS จะ readyState < 2 อยู่พักหนึ่งหลัง play)
+        if (el.video.readyState < 2 || !el.video.videoWidth) { setTimeout(scanFrame, 100); return; }
         try {
             const size = { width: el.video.clientWidth, height: el.video.clientHeight };
             if (el.canvas.width !== size.width || el.canvas.height !== size.height) faceapi.matchDimensions(el.canvas, size);
@@ -487,7 +509,7 @@ async function onVideoPlay() {
                 const match = faceMatcher.findBestMatch(resized.descriptor);
                 const unknown = match.label === 'unknown';
                 new faceapi.draw.DrawBox(resized.detection.box, {
-                    label: unknown ? 'Unknown' : `${employees[match.label]?.name || match.label} (${(1 - match.distance).toFixed(2)})`,
+                    label: unknown ? 'Unknown' : `${(employees[match.label] && employees[match.label].name) || match.label} (${(1 - match.distance).toFixed(2)})`,
                     boxColor: unknown ? 'red' : '#10b981', lineWidth: 2
                 }).draw(el.canvas);
                 unknown ? clearScanPanel(true) : updateScanPanel(match.label);
@@ -495,7 +517,7 @@ async function onVideoPlay() {
                 clearScanPanel(false);
             }
         } catch (e) { console.error('Scan error:', e); }
-        if (isCameraRunning) requestAnimationFrame(scanFrame);
+        if (isCameraRunning) setTimeout(scanFrame, isMobile ? 120 : 30);
     }
     scanFrame();
 }
@@ -583,7 +605,7 @@ function renderLogs() {
 
 function exportToCSV() {
     if (logs.length === 0) { alert('ไม่มีข้อมูลสำหรับดาวน์โหลด'); return; }
-    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     const rows = [['Timestamp', 'Type', 'Employee ID', 'Name', 'Department', 'Position'].join(',')];
     logs.forEach(l => rows.push([l.timestamp, l.type, l.empId, l.name, l.dept, l.pos].map(q).join(',')));
     const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -594,30 +616,13 @@ function exportToCSV() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* ================== Settings ================== */
-function saveGasUrl() {
-    const raw = el.gasUrl.value.trim();
-    if (raw && !gasUrl()) { alert('URL ต้องขึ้นต้นด้วย https://script.google.com/ และลงท้ายด้วย /exec'); return; }
-    try { localStorage.setItem(STORAGE_KEY_GAS, raw); } catch (_) {}
-    const orig = el.btnSaveGas.innerHTML;
-    el.btnSaveGas.innerHTML = '<i class="fa-solid fa-check"></i> บันทึกแล้ว';
-    setTimeout(() => { el.btnSaveGas.innerHTML = orig; }, 1500);
-    if (raw) syncFromSheet();
-}
-
 /* ================== Init ================== */
 function init() {
-    // อ่าน URL จาก ?gas=... ใน address bar ก่อน (สะดวกเวลาแชร์ลิงก์) ถ้าไม่มีค่อยใช้ค่าที่บันทึกไว้
-    const fromQuery = new URLSearchParams(location.search).get('gas');
-    let saved = '';
-    try { saved = localStorage.getItem(STORAGE_KEY_GAS) || ''; } catch (_) {}
-    el.gasUrl.value = fromQuery || saved;
-
+    if (typeof faceapi === 'undefined') showFatal('โหลดไลบรารี face-api.js ไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต / ตัวบล็อกโฆษณา)');
     for (let i = 0; i < 3; i++) createEmployeeForm();
 
     el.btnAddForm.addEventListener('click', createEmployeeForm);
     el.btnBuildDb.addEventListener('click', buildFaceDatabase);
-    el.btnSaveGas.addEventListener('click', saveGasUrl);
     el.btnSync.addEventListener('click', syncFromSheet);
     el.btnStart.addEventListener('click', startCamera);
     el.btnStop.addEventListener('click', stopCamera);
@@ -626,10 +631,9 @@ function init() {
     el.btnCheckout.addEventListener('click', () => recordAction('Check Out'));
     el.btnRefreshLogs.addEventListener('click', refreshLogs);
     el.btnExport.addEventListener('click', exportToCSV);
-    el.video.addEventListener('play', onVideoPlay);
+    el.video.addEventListener('playing', onVideoPlay);
 
-    if (gasUrl()) syncFromSheet();
-    else setConn('none', 'ใส่ URL ของ Apps Script แล้วกดบันทึก');
+    syncFromSheet();
 }
 
 document.addEventListener('DOMContentLoaded', init);

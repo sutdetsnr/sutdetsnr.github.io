@@ -1,1 +1,642 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสแกนใบหน้าลงเวลา (Google Sheet)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- face-api.js (vladmandic fork) pinned 1.7.12 -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    <style>
+        body { font-family: 'Sarabun', 'Segoe UI', Tahoma, sans-serif; background-color: #f3f4f6; }
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: 0 auto; background: #000; border-radius: 0.5rem; overflow: hidden; aspect-ratio: 4/3; }
+        #camera-video { width: 100%; height: 100%; object-fit: cover; }
+        #overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .loader { border: 4px solid #e5e7eb; border-top: 4px solid #3b82f6; border-radius: 50%; width: 22px; height: 22px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 50; min-width: 260px; }
+    </style>
+</head>
+<body class="text-gray-800">
 
+<div class="container mx-auto p-4 max-w-6xl">
+
+    <!-- Header & Settings -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h1 class="text-3xl font-bold text-blue-600 mb-2"><i class="fa-solid fa-face-viewfinder"></i> ระบบสแกนใบหน้าลงเวลาพนักงาน</h1>
+        <p class="text-gray-600 mb-4">Face Recognition Check-in — เก็บข้อมูลบน Google Sheet ผ่าน Apps Script</p>
+
+        <div class="bg-gray-50 p-3 rounded-md border border-gray-200 flex flex-wrap items-center gap-3 text-sm">
+            <span id="conn-badge" class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700">ยังไม่เชื่อมต่อ</span>
+            <span id="conn-msg" class="text-gray-500 flex-1"></span>
+            <button id="btn-sync" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md transition"><i class="fa-solid fa-rotate"></i> โหลดข้อมูลจาก Sheet</button>
+        </div>
+    </div>
+
+    <!-- Section 1: Registration -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6" id="section-register">
+        <h2 class="text-2xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-users"></i> 1. ลงทะเบียนพนักงาน</h2>
+
+        <!-- Registered list -->
+        <div class="mb-5">
+            <h3 class="font-semibold text-gray-700 mb-2">พนักงานในระบบ (<span id="emp-count">0</span> คน)</h3>
+            <div id="employee-list" class="flex flex-wrap gap-2 text-sm">
+                <span class="text-gray-400">ยังไม่มีข้อมูล</span>
+            </div>
+        </div>
+
+        <h3 class="font-semibold text-gray-700 mb-2">เพิ่ม / แก้ไขพนักงาน (ถ้ารหัสซ้ำจะอัปเดตข้อมูลเดิม)</h3>
+        <div id="employee-forms-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4"></div>
+
+        <div class="flex flex-wrap items-center gap-4 mt-4">
+            <button id="btn-add-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md font-semibold transition"><i class="fa-solid fa-plus"></i> เพิ่มฟอร์ม</button>
+            <button id="btn-build-db" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-bold shadow-md transition disabled:opacity-50"><i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลใบหน้า &amp; บันทึกลง Sheet</button>
+            <div id="build-status" class="text-sm font-semibold text-blue-600 hidden items-center">
+                <div class="loader mr-2"></div><span id="build-status-text"></span>
+            </div>
+        </div>
+        <div id="build-error-msg" class="text-red-500 text-sm mt-2 font-semibold"></div>
+    </div>
+
+    <!-- Section 2: Scanning -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6 opacity-50 pointer-events-none transition-opacity duration-300" id="section-scan">
+        <h2 class="text-2xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-camera"></i> 2. สแกนใบหน้า (Check-in / Check-out)</h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <div class="flex gap-2 mb-3">
+                    <button id="btn-start-camera" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-semibold transition"><i class="fa-solid fa-video"></i> เปิดกล้อง</button>
+                    <button id="btn-stop-camera" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md font-semibold transition hidden"><i class="fa-solid fa-video-slash"></i> ปิดกล้อง</button>
+                </div>
+
+                <div id="camera-error-panel" class="hidden bg-red-50 border border-red-300 text-red-800 p-4 rounded-md mb-3 text-sm">
+                    <div id="camera-error-msg" class="mb-2 font-semibold"></div>
+                    <button id="btn-retry-camera" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"><i class="fa-solid fa-rotate-right"></i> ลองใหม่</button>
+                </div>
+
+                <div class="video-container border-2 border-gray-300">
+                    <video id="camera-video" playsinline muted autoplay></video>
+                    <canvas id="overlay-canvas"></canvas>
+                    <div id="camera-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-500">
+                        <span><i class="fa-solid fa-eye-slash text-4xl mb-2 block text-center"></i> กล้องปิดอยู่</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col justify-center">
+                <div class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center h-full flex flex-col items-center justify-center">
+                    <div id="scan-waiting" class="text-gray-500">
+                        <i class="fa-solid fa-user-clock text-5xl mb-3"></i>
+                        <p>รอการสแกนใบหน้า...</p>
+                    </div>
+
+                    <div id="scan-matched" class="hidden w-full">
+                        <div class="bg-green-100 text-green-800 p-3 rounded-full inline-block mb-4">
+                            <i class="fa-solid fa-check-circle text-4xl"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-1" id="matched-name"></h3>
+                        <p class="text-gray-600 mb-1">รหัส: <span id="matched-id" class="font-semibold"></span></p>
+                        <p class="text-gray-600 mb-6">แผนก: <span id="matched-dept"></span> | <span id="matched-pos"></span></p>
+                        <div class="flex gap-4 justify-center">
+                            <button id="btn-checkin" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold shadow-lg transition transform hover:scale-105 disabled:opacity-50"><i class="fa-solid fa-sign-in-alt"></i> Check In</button>
+                            <button id="btn-checkout" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg transition transform hover:scale-105 disabled:opacity-50"><i class="fa-solid fa-sign-out-alt"></i> Check Out</button>
+                        </div>
+                        <p id="check-action-msg" class="font-semibold mt-4 h-6"></p>
+                    </div>
+
+                    <div id="scan-unknown" class="hidden w-full">
+                        <div class="bg-red-100 text-red-800 p-3 rounded-full inline-block mb-4">
+                            <i class="fa-solid fa-user-secret text-4xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-red-600">ไม่รู้จักใบหน้านี้</h3>
+                        <p class="text-gray-500 mt-2">กรุณาขยับหน้าให้ชัดเจน หรือลงทะเบียนก่อน</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 3: Logs -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex flex-wrap justify-between items-center gap-2 mb-4 border-b pb-2">
+            <h2 class="text-2xl font-bold"><i class="fa-solid fa-clipboard-list"></i> 3. ข้อมูลการลงเวลา</h2>
+            <div class="flex gap-2">
+                <button id="btn-refresh-logs" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded text-sm transition"><i class="fa-solid fa-rotate"></i> รีเฟรช</button>
+                <button id="btn-export-csv" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition"><i class="fa-solid fa-file-csv"></i> ดาวน์โหลด CSV</button>
+            </div>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">แสดง 300 รายการล่าสุด — ข้อมูลทั้งหมดอยู่ในชีต "Logs" ของ Google Sheet</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="p-3 border-b">วัน-เวลา</th>
+                        <th class="p-3 border-b">ประเภท</th>
+                        <th class="p-3 border-b">รหัส</th>
+                        <th class="p-3 border-b">ชื่อ-นามสกุล</th>
+                        <th class="p-3 border-b">แผนก</th>
+                        <th class="p-3 border-b">ตำแหน่ง</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-tbody"></tbody>
+            </table>
+            <div id="no-logs-msg" class="text-center py-6 text-gray-500">ยังไม่มีข้อมูลการลงเวลา</div>
+        </div>
+    </div>
+</div>
+
+<div id="err-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-sm px-4 py-2 shadow-lg"><b>เกิดข้อผิดพลาด:</b> <span id="err-banner-text"></span> <button onclick="this.parentNode.classList.add('hidden')" class="float-right font-bold px-2">✕</button></div>
+<div id="toast" class="toast hidden bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm"></div>
+
+<script>
+/* ================== Global error display (สำหรับมือถือที่ไม่มี console) ================== */
+function showFatal(msg) {
+    var b = document.getElementById('err-banner'), t = document.getElementById('err-banner-text');
+    if (b && t) { t.textContent = msg; b.classList.remove('hidden'); }
+}
+window.addEventListener('error', function (e) { showFatal((e.message || 'Script error') + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '')); });
+window.addEventListener('unhandledrejection', function (e) { showFatal((e.reason && e.reason.message) || String(e.reason)); });
+
+/* ================== Config & State ================== */
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+// Google Apps Script Web App URL (Deploy: Execute as Me / Who has access: Anyone)
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwS1qiNAFwdMDl0rdxLf0tw4_5JvOKnMEOazlke-MuZ7l994flqjt4imvlld4i6Js6iQA/exec';
+const MATCH_THRESHOLD = 0.55;      // ยิ่งต่ำยิ่งเข้มงวด (0.6 = ค่าปกติของ face-api)
+const COOLDOWN_MS = 60 * 1000;     // กันกดซ้ำคนเดิม/ประเภทเดิม ภายใน 1 นาที
+
+let formCount = 0;
+let modelsLoaded = false;
+let faceMatcher = null;
+let employees = {};        // empId -> { name, dept, pos, descriptor:[128] }
+let logs = [];
+let isCameraRunning = false;
+let videoStream = null;
+let currentMatchedEmpId = null;
+let lastAction = {};       // `${empId}|${type}` -> timestamp ms
+
+const $ = id => document.getElementById(id);
+const el = {
+    btnSync: $('btn-sync'),
+    connBadge: $('conn-badge'), connMsg: $('conn-msg'),
+    empList: $('employee-list'), empCount: $('emp-count'),
+    forms: $('employee-forms-container'), btnAddForm: $('btn-add-form'), btnBuildDb: $('btn-build-db'),
+    buildStatus: $('build-status'), buildStatusText: $('build-status-text'), buildError: $('build-error-msg'),
+    sectionScan: $('section-scan'), video: $('camera-video'), canvas: $('overlay-canvas'), placeholder: $('camera-placeholder'),
+    btnStart: $('btn-start-camera'), btnStop: $('btn-stop-camera'), camErrPanel: $('camera-error-panel'), camErrMsg: $('camera-error-msg'), btnRetry: $('btn-retry-camera'),
+    scanWaiting: $('scan-waiting'), scanMatched: $('scan-matched'), scanUnknown: $('scan-unknown'),
+    mName: $('matched-name'), mId: $('matched-id'), mDept: $('matched-dept'), mPos: $('matched-pos'),
+    btnCheckin: $('btn-checkin'), btnCheckout: $('btn-checkout'), actionMsg: $('check-action-msg'),
+    logsBody: $('logs-tbody'), noLogs: $('no-logs-msg'), btnRefreshLogs: $('btn-refresh-logs'), btnExport: $('btn-export-csv'),
+    toast: $('toast')
+};
+
+/* ================== Utilities ================== */
+const yieldBrowser = () => new Promise(r => setTimeout(r, 10));
+const escapeHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let toastTimer = null;
+function toast(msg, isError = false) {
+    el.toast.textContent = msg;
+    el.toast.className = `toast px-4 py-3 rounded-lg shadow-lg text-sm text-white ${isError ? 'bg-red-600' : 'bg-gray-900'}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.add('hidden'), 3500);
+}
+
+function setConn(state, msg) {
+    const map = {
+        none: ['bg-gray-200 text-gray-700', 'ยังไม่เชื่อมต่อ'],
+        loading: ['bg-yellow-100 text-yellow-800', 'กำลังเชื่อมต่อ...'],
+        ok: ['bg-green-100 text-green-800', 'เชื่อมต่อแล้ว'],
+        error: ['bg-red-100 text-red-800', 'เชื่อมต่อไม่ได้']
+    };
+    el.connBadge.className = `px-2 py-0.5 rounded text-xs font-semibold ${map[state][0]}`;
+    el.connBadge.textContent = map[state][1];
+    el.connMsg.textContent = msg || '';
+}
+
+function resizeImageForAI(img, maxSide = 640) {
+    const canvas = document.createElement('canvas');
+    let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if (w > h && w > maxSide) { h = Math.round(h * maxSide / w); w = maxSide; }
+    else if (h >= w && h > maxSide) { w = Math.round(w * maxSide / h); h = maxSide; }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+/* ================== Google Apps Script API ================== */
+function gasUrl() { return GAS_URL; }
+
+async function apiGet(action, params = {}) {
+    const url = new URL(gasUrl());
+    url.searchParams.set('action', action);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 20000);
+    try {
+        const res = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'API error');
+        return data;
+    } finally { clearTimeout(t); }
+}
+
+async function apiPost(payload) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 20000);
+    try {
+        // ส่ง body เป็น string โดยไม่ตั้ง header เพื่อให้เป็น simple request (ไม่มี preflight) และอ่านผลลัพธ์ได้
+        const res = await fetch(gasUrl(), { method: 'POST', redirect: 'follow', body: JSON.stringify(payload), signal: controller.signal });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'API error');
+        return data;
+    } finally { clearTimeout(t); }
+}
+
+/* ================== Models ================== */
+async function ensureModels(statusCb) {
+    if (modelsLoaded) return;
+    statusCb && statusCb('กำลังโหลด AI Models (ครั้งแรกใช้เวลาสักครู่)...');
+    await yieldBrowser();
+    await Promise.race([
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('โหลดโมเดลไม่สำเร็จใน 45 วินาที กรุณาตรวจสอบอินเทอร์เน็ต')), 45000))
+    ]);
+    // เลือก backend: webgl ก่อน ถ้าไม่ได้ (เช่น iPad รุ่นเก่า) ใช้ cpu
+    try {
+        await faceapi.tf.setBackend('webgl');
+        await faceapi.tf.ready();
+    } catch (e) {
+        console.warn('webgl backend failed, fallback to cpu', e);
+        await faceapi.tf.setBackend('cpu');
+        await faceapi.tf.ready();
+    }
+    modelsLoaded = true;
+}
+
+/* ================== Sync from Sheet ================== */
+async function syncFromSheet() {
+    setConn('loading');
+    el.btnSync.disabled = true;
+    try {
+        const [empRes, logRes] = await Promise.all([apiGet('employees'), apiGet('logs', { limit: 300 })]);
+        employees = {};
+        empRes.employees.forEach(e => { employees[e.empId] = e; });
+        logs = logRes.logs;
+        renderEmployees();
+        renderLogs();
+        rebuildMatcher();
+        setConn('ok', `พนักงาน ${Object.keys(employees).length} คน, ประวัติ ${logs.length} รายการ`);
+    } catch (err) {
+        console.error(err);
+        setConn('error', err.message);
+        toast('โหลดข้อมูลจาก Sheet ไม่สำเร็จ: ' + err.message, true);
+    } finally { el.btnSync.disabled = false; }
+}
+
+function rebuildMatcher() {
+    const list = Object.values(employees).map(e =>
+        new faceapi.LabeledFaceDescriptors(e.empId, [new Float32Array(e.descriptor)])
+    );
+    if (list.length === 0) {
+        faceMatcher = null;
+        el.sectionScan.classList.add('opacity-50', 'pointer-events-none');
+        return;
+    }
+    faceMatcher = new faceapi.FaceMatcher(list, MATCH_THRESHOLD);
+    el.sectionScan.classList.remove('opacity-50', 'pointer-events-none');
+}
+
+function renderEmployees() {
+    const list = Object.values(employees).sort((a, b) => a.empId.localeCompare(b.empId));
+    el.empCount.textContent = list.length;
+    if (list.length === 0) { el.empList.innerHTML = '<span class="text-gray-400">ยังไม่มีข้อมูล</span>'; return; }
+    el.empList.innerHTML = list.map(e => `
+        <span class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-900 px-3 py-1 rounded-full">
+            <b>${escapeHtml(e.empId)}</b> ${escapeHtml(e.name)}${e.dept ? ` <span class="text-blue-500 text-xs">(${escapeHtml(e.dept)})</span>` : ''}
+            <button type="button" class="text-red-400 hover:text-red-600" title="ลบ" onclick="deleteEmployee('${escapeHtml(e.empId)}')"><i class="fa-solid fa-xmark"></i></button>
+        </span>`).join('');
+}
+
+async function deleteEmployee(empId) {
+    if (!confirm(`ลบพนักงาน ${empId} ออกจากระบบ?`)) return;
+    try {
+        await apiPost({ action: 'delete', empId });
+        delete employees[empId];
+        renderEmployees();
+        rebuildMatcher();
+        toast(`ลบ ${empId} แล้ว`);
+    } catch (err) { toast('ลบไม่สำเร็จ: ' + err.message, true); }
+}
+
+/* ================== Registration forms ================== */
+function createEmployeeForm() {
+    formCount++;
+    const id = `emp-form-${formCount}`;
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded-md p-4 bg-gray-50 flex flex-col relative';
+    div.id = id;
+    div.innerHTML = `
+        <button type="button" class="absolute top-2 right-2 text-red-400 hover:text-red-600" onclick="document.getElementById('${id}').remove()"><i class="fa-solid fa-xmark"></i></button>
+        <div class="mb-2"><label class="block text-xs font-semibold mb-1">รหัสพนักงาน *</label>
+            <input type="text" class="w-full px-2 py-1 text-sm border rounded input-empid" placeholder="EMP00${formCount}"></div>
+        <div class="mb-2"><label class="block text-xs font-semibold mb-1">ชื่อ-นามสกุล *</label>
+            <input type="text" class="w-full px-2 py-1 text-sm border rounded input-name" placeholder="ชื่อ นามสกุล"></div>
+        <div class="flex gap-2 mb-2">
+            <div class="flex-1"><label class="block text-xs font-semibold mb-1">แผนก</label>
+                <input type="text" class="w-full px-2 py-1 text-sm border rounded input-dept"></div>
+            <div class="flex-1"><label class="block text-xs font-semibold mb-1">ตำแหน่ง</label>
+                <input type="text" class="w-full px-2 py-1 text-sm border rounded input-pos"></div>
+        </div>
+        <div class="mt-2"><label class="block text-xs font-semibold mb-1">รูปถ่ายหน้าตรง *</label>
+            <input type="file" accept="image/*" class="text-xs w-full input-file" onchange="handleImagePreview(this, '${id}')">
+            <div class="mt-2 h-24 bg-gray-200 rounded flex items-center justify-center overflow-hidden img-preview-container">
+                <span class="text-gray-400 text-xs">Preview</span>
+                <img class="img-preview hidden w-full h-full object-cover" src="" alt="">
+            </div>
+            <input type="hidden" class="input-base64">
+            <div class="text-xs mt-1 form-status"></div>
+        </div>`;
+    el.forms.appendChild(div);
+}
+
+function handleImagePreview(fileInput, formId) {
+    const file = fileInput.files[0];
+    const form = $(formId);
+    const imgPreview = form.querySelector('.img-preview');
+    const txt = form.querySelector('.img-preview-container span');
+    const b64 = form.querySelector('.input-base64');
+    if (!file) { imgPreview.classList.add('hidden'); txt.classList.remove('hidden'); b64.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const resized = resizeImageForAI(img);
+            imgPreview.src = resized; imgPreview.classList.remove('hidden'); txt.classList.add('hidden'); b64.value = resized;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function buildFaceDatabase() {
+    el.buildError.textContent = '';
+
+    const forms = [...document.querySelectorAll('[id^="emp-form-"]')].map(f => ({
+        el: f,
+        empId: f.querySelector('.input-empid').value.trim(),
+        name: f.querySelector('.input-name').value.trim(),
+        dept: f.querySelector('.input-dept').value.trim(),
+        pos: f.querySelector('.input-pos').value.trim(),
+        imageBase64: f.querySelector('.input-base64').value,
+        status: f.querySelector('.form-status')
+    })).filter(f => f.imageBase64);
+
+    if (forms.length === 0) { alert('กรุณาอัปโหลดรูปพนักงานอย่างน้อย 1 คน'); return; }
+    const missing = forms.filter(f => !f.empId || !f.name);
+    if (missing.length) { alert('กรุณากรอกรหัสพนักงานและชื่อให้ครบทุกฟอร์มที่มีรูป'); return; }
+
+    el.btnBuildDb.disabled = true;
+    el.buildStatus.classList.remove('hidden'); el.buildStatus.classList.add('flex');
+    const setStatus = t => { el.buildStatusText.textContent = t; };
+
+    let okCount = 0;
+    try {
+        await ensureModels(setStatus);
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+
+        for (let i = 0; i < forms.length; i++) {
+            const f = forms[i];
+            setStatus(`ประมวลผลใบหน้า ${i + 1}/${forms.length} (${f.name})...`);
+            f.status.textContent = 'กำลังประมวลผล...'; f.status.className = 'text-xs mt-1 form-status text-blue-600';
+            await yieldBrowser();
+
+            const img = await faceapi.fetchImage(f.imageBase64);
+            const det = await faceapi.detectSingleFace(img, options).withFaceLandmarks().withFaceDescriptor();
+            if (!det) {
+                f.status.textContent = 'ไม่พบใบหน้าในรูป กรุณาใช้รูปหน้าตรงที่ชัดกว่านี้';
+                f.status.className = 'text-xs mt-1 form-status text-red-600';
+                continue;
+            }
+
+            setStatus(`บันทึก ${f.name} ลง Google Sheet...`);
+            const payload = { action: 'register', empId: f.empId, name: f.name, dept: f.dept, pos: f.pos, descriptor: Array.from(det.descriptor) };
+            try {
+                await apiPost(payload);
+                employees[f.empId] = { empId: f.empId, name: f.name, dept: f.dept, pos: f.pos, descriptor: payload.descriptor };
+                f.status.textContent = 'บันทึกแล้ว ✓'; f.status.className = 'text-xs mt-1 form-status text-green-600';
+                okCount++;
+            } catch (err) {
+                f.status.textContent = 'บันทึกไม่สำเร็จ: ' + err.message; f.status.className = 'text-xs mt-1 form-status text-red-600';
+            }
+        }
+
+        renderEmployees();
+        rebuildMatcher();
+        setStatus(`เสร็จสิ้น บันทึก ${okCount}/${forms.length} คน`);
+        toast(`บันทึกพนักงาน ${okCount} คนลง Google Sheet แล้ว`);
+        // ล้างฟอร์มที่บันทึกสำเร็จ
+        forms.forEach(f => { if (f.status.textContent.startsWith('บันทึกแล้ว')) setTimeout(() => f.el.remove(), 1500); });
+        setTimeout(() => { el.buildStatus.classList.add('hidden'); el.buildStatus.classList.remove('flex'); }, 2500);
+    } catch (err) {
+        console.error(err);
+        el.buildError.textContent = err.message;
+        el.buildStatus.classList.add('hidden'); el.buildStatus.classList.remove('flex');
+    } finally {
+        el.btnBuildDb.disabled = false;
+    }
+}
+
+/* ================== Camera & Scanning ================== */
+async function startCamera() {
+    el.camErrPanel.classList.add('hidden');
+    try {
+        await ensureModels(t => setConn('loading', t));
+        setConn('ok', `พนักงาน ${Object.keys(employees).length} คน`);
+        videoStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
+        });
+        el.video.srcObject = videoStream;
+        isCameraRunning = true;
+        try { await el.video.play(); } catch (e) { console.warn('video.play()', e); }
+        el.btnStart.classList.add('hidden'); el.btnStop.classList.remove('hidden'); el.placeholder.classList.add('hidden');
+    } catch (err) {
+        console.error('Camera Error:', err);
+        let html = `<b>${escapeHtml(err.name || 'Error')}</b><br>${escapeHtml(err.message)}`;
+        if (location.protocol === 'file:') html += '<br>กล้องใช้ไม่ได้เมื่อเปิดไฟล์ตรงๆ (file://) ต้องเปิดผ่าน https:// เช่น GitHub Pages';
+        else if (err.name === 'NotAllowedError') html += '<br>โปรดอนุญาตสิทธิ์การใช้งานกล้องในเบราว์เซอร์';
+        else if (err.name === 'NotFoundError') html += '<br>ไม่พบอุปกรณ์กล้องในเครื่องนี้';
+        else if (err.name === 'NotReadableError') html += '<br>กล้องอาจถูกใช้งานโดยแอปอื่นอยู่';
+        el.camErrMsg.innerHTML = html;
+        el.camErrPanel.classList.remove('hidden');
+    }
+}
+
+function stopCamera() {
+    isCameraRunning = false;
+    if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    el.video.srcObject = null;
+    el.btnStart.classList.remove('hidden'); el.btnStop.classList.add('hidden'); el.placeholder.classList.remove('hidden');
+    el.canvas.getContext('2d').clearRect(0, 0, el.canvas.width, el.canvas.height);
+    clearScanPanel(false);
+}
+
+async function onVideoPlay() {
+    if (!faceMatcher || !isCameraRunning) return;
+    const ctx = el.canvas.getContext('2d');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: isMobile ? 160 : 224, scoreThreshold: 0.5 });
+
+    async function scanFrame() {
+        if (el.video.paused || el.video.ended || !isCameraRunning) return;
+        // รอให้วิดีโอมีภาพจริงก่อน (iOS จะ readyState < 2 อยู่พักหนึ่งหลัง play)
+        if (el.video.readyState < 2 || !el.video.videoWidth) { setTimeout(scanFrame, 100); return; }
+        try {
+            const size = { width: el.video.clientWidth, height: el.video.clientHeight };
+            if (el.canvas.width !== size.width || el.canvas.height !== size.height) faceapi.matchDimensions(el.canvas, size);
+
+            const det = await faceapi.detectSingleFace(el.video, options).withFaceLandmarks().withFaceDescriptor();
+            ctx.clearRect(0, 0, el.canvas.width, el.canvas.height);
+
+            if (det && faceMatcher) {
+                const resized = faceapi.resizeResults(det, size);
+                const match = faceMatcher.findBestMatch(resized.descriptor);
+                const unknown = match.label === 'unknown';
+                new faceapi.draw.DrawBox(resized.detection.box, {
+                    label: unknown ? 'Unknown' : `${(employees[match.label] && employees[match.label].name) || match.label} (${(1 - match.distance).toFixed(2)})`,
+                    boxColor: unknown ? 'red' : '#10b981', lineWidth: 2
+                }).draw(el.canvas);
+                unknown ? clearScanPanel(true) : updateScanPanel(match.label);
+            } else {
+                clearScanPanel(false);
+            }
+        } catch (e) { console.error('Scan error:', e); }
+        if (isCameraRunning) setTimeout(scanFrame, isMobile ? 120 : 30);
+    }
+    scanFrame();
+}
+
+let panelClearTimeout = null;
+function updateScanPanel(empId) {
+    if (panelClearTimeout) { clearTimeout(panelClearTimeout); panelClearTimeout = null; }
+    if (currentMatchedEmpId === empId) return;
+    currentMatchedEmpId = empId;
+    const d = employees[empId];
+    el.scanWaiting.classList.add('hidden'); el.scanUnknown.classList.add('hidden'); el.scanMatched.classList.remove('hidden');
+    el.mName.textContent = d.name; el.mId.textContent = empId;
+    el.mDept.textContent = d.dept || '-'; el.mPos.textContent = d.pos || '-';
+    el.actionMsg.textContent = '';
+}
+
+function clearScanPanel(isUnknown) {
+    if (panelClearTimeout) return;
+    panelClearTimeout = setTimeout(() => {
+        currentMatchedEmpId = null;
+        el.actionMsg.textContent = '';
+        el.scanMatched.classList.add('hidden');
+        el.scanUnknown.classList.toggle('hidden', !isUnknown);
+        el.scanWaiting.classList.toggle('hidden', isUnknown);
+        panelClearTimeout = null;
+    }, 700);
+}
+
+/* ================== Logging ================== */
+async function recordAction(type) {
+    if (!currentMatchedEmpId) return;
+    const empId = currentMatchedEmpId;
+    const d = employees[empId];
+    const key = `${empId}|${type}`;
+    if (Date.now() - (lastAction[key] || 0) < COOLDOWN_MS) {
+        el.actionMsg.textContent = `บันทึก ${type} ของ ${d.name} ไปแล้วเมื่อสักครู่`;
+        el.actionMsg.className = 'font-semibold mt-4 h-6 text-yellow-600';
+        return;
+    }
+    el.btnCheckin.disabled = el.btnCheckout.disabled = true;
+    el.actionMsg.textContent = 'กำลังบันทึกลง Google Sheet...';
+    el.actionMsg.className = 'font-semibold mt-4 h-6 text-blue-600';
+    try {
+        const res = await apiPost({ action: 'log', type, empId, name: d.name, dept: d.dept || '', pos: d.pos || '' });
+        logs.unshift(res.log);
+        renderLogs();
+        lastAction[key] = Date.now();
+        el.actionMsg.textContent = `บันทึก ${type} สำเร็จ (${res.log.timestamp})`;
+        el.actionMsg.className = `font-semibold mt-4 h-6 ${type === 'Check In' ? 'text-green-600' : 'text-orange-600'}`;
+    } catch (err) {
+        el.actionMsg.textContent = 'บันทึกไม่สำเร็จ: ' + err.message;
+        el.actionMsg.className = 'font-semibold mt-4 h-6 text-red-600';
+    } finally {
+        el.btnCheckin.disabled = el.btnCheckout.disabled = false;
+        setTimeout(() => { el.actionMsg.textContent = ''; }, 4000);
+    }
+}
+
+async function refreshLogs() {
+    el.btnRefreshLogs.disabled = true;
+    try {
+        const res = await apiGet('logs', { limit: 300 });
+        logs = res.logs; renderLogs();
+    } catch (err) { toast('โหลดประวัติไม่สำเร็จ: ' + err.message, true); }
+    finally { el.btnRefreshLogs.disabled = false; }
+}
+
+function renderLogs() {
+    el.logsBody.innerHTML = '';
+    el.noLogs.classList.toggle('hidden', logs.length > 0);
+    logs.forEach(log => {
+        const badge = log.type === 'Check In' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800';
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-gray-100 hover:bg-gray-50';
+        tr.innerHTML = `
+            <td class="p-3 text-sm text-gray-600 whitespace-nowrap">${escapeHtml(log.timestamp)}</td>
+            <td class="p-3"><span class="${badge} px-2 py-1 rounded text-xs font-semibold">${escapeHtml(log.type)}</span></td>
+            <td class="p-3 text-sm font-semibold">${escapeHtml(log.empId)}</td>
+            <td class="p-3 text-sm">${escapeHtml(log.name)}</td>
+            <td class="p-3 text-sm">${escapeHtml(log.dept)}</td>
+            <td class="p-3 text-sm">${escapeHtml(log.pos)}</td>`;
+        el.logsBody.appendChild(tr);
+    });
+}
+
+function exportToCSV() {
+    if (logs.length === 0) { alert('ไม่มีข้อมูลสำหรับดาวน์โหลด'); return; }
+    const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const rows = [['Timestamp', 'Type', 'Employee ID', 'Name', 'Department', 'Position'].join(',')];
+    logs.forEach(l => rows.push([l.timestamp, l.type, l.empId, l.name, l.dept, l.pos].map(q).join(',')));
+    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `checkin_logs_${Date.now()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ================== Init ================== */
+function init() {
+    if (typeof faceapi === 'undefined') showFatal('โหลดไลบรารี face-api.js ไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต / ตัวบล็อกโฆษณา)');
+    for (let i = 0; i < 3; i++) createEmployeeForm();
+
+    el.btnAddForm.addEventListener('click', createEmployeeForm);
+    el.btnBuildDb.addEventListener('click', buildFaceDatabase);
+    el.btnSync.addEventListener('click', syncFromSheet);
+    el.btnStart.addEventListener('click', startCamera);
+    el.btnStop.addEventListener('click', stopCamera);
+    el.btnRetry.addEventListener('click', startCamera);
+    el.btnCheckin.addEventListener('click', () => recordAction('Check In'));
+    el.btnCheckout.addEventListener('click', () => recordAction('Check Out'));
+    el.btnRefreshLogs.addEventListener('click', refreshLogs);
+    el.btnExport.addEventListener('click', exportToCSV);
+    el.video.addEventListener('playing', onVideoPlay);
+
+    syncFromSheet();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

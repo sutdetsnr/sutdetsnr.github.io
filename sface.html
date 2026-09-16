@@ -28,17 +28,10 @@
         <h1 class="text-3xl font-bold text-blue-600 mb-2"><i class="fa-solid fa-face-viewfinder"></i> ระบบสแกนใบหน้าลงเวลาพนักงาน</h1>
         <p class="text-gray-600 mb-4">Face Recognition Check-in — เก็บข้อมูลบน Google Sheet ผ่าน Apps Script</p>
 
-        <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-            <label class="block text-sm font-semibold mb-1">Google Apps Script Web App URL</label>
-            <div class="flex flex-wrap gap-2">
-                <input type="text" id="gas-url" class="flex-1 min-w-[260px] px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300" placeholder="https://script.google.com/macros/s/xxxx/exec">
-                <button id="btn-save-gas" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md transition"><i class="fa-solid fa-floppy-disk"></i> บันทึก URL</button>
-                <button id="btn-sync" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"><i class="fa-solid fa-rotate"></i> โหลดข้อมูลจาก Sheet</button>
-            </div>
-            <div class="flex items-center gap-2 mt-2 text-sm">
-                <span id="conn-badge" class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700">ยังไม่เชื่อมต่อ</span>
-                <span id="conn-msg" class="text-gray-500"></span>
-            </div>
+        <div class="bg-gray-50 p-3 rounded-md border border-gray-200 flex flex-wrap items-center gap-3 text-sm">
+            <span id="conn-badge" class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700">ยังไม่เชื่อมต่อ</span>
+            <span id="conn-msg" class="text-gray-500 flex-1"></span>
+            <button id="btn-sync" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md transition"><i class="fa-solid fa-rotate"></i> โหลดข้อมูลจาก Sheet</button>
         </div>
     </div>
 
@@ -159,7 +152,8 @@
 <script>
 /* ================== Config & State ================== */
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
-const STORAGE_KEY_GAS = 'face_checkin_gas_url';
+// Google Apps Script Web App URL (Deploy: Execute as Me / Who has access: Anyone)
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwS1qiNAFwdMDl0rdxLf0tw4_5JvOKnMEOazlke-MuZ7l994flqjt4imvlld4i6Js6iQA/exec';
 const MATCH_THRESHOLD = 0.55;      // ยิ่งต่ำยิ่งเข้มงวด (0.6 = ค่าปกติของ face-api)
 const COOLDOWN_MS = 60 * 1000;     // กันกดซ้ำคนเดิม/ประเภทเดิม ภายใน 1 นาที
 
@@ -175,7 +169,7 @@ let lastAction = {};       // `${empId}|${type}` -> timestamp ms
 
 const $ = id => document.getElementById(id);
 const el = {
-    gasUrl: $('gas-url'), btnSaveGas: $('btn-save-gas'), btnSync: $('btn-sync'),
+    btnSync: $('btn-sync'),
     connBadge: $('conn-badge'), connMsg: $('conn-msg'),
     empList: $('employee-list'), empCount: $('emp-count'),
     forms: $('employee-forms-container'), btnAddForm: $('btn-add-form'), btnBuildDb: $('btn-build-db'),
@@ -224,10 +218,7 @@ function resizeImageForAI(img, maxSide = 640) {
 }
 
 /* ================== Google Apps Script API ================== */
-function gasUrl() {
-    const u = el.gasUrl.value.trim();
-    return /^https:\/\/script\.google\.com\/.+\/exec$/.test(u) ? u : '';
-}
+function gasUrl() { return GAS_URL; }
 
 async function apiGet(action, params = {}) {
     const url = new URL(gasUrl());
@@ -273,7 +264,6 @@ async function ensureModels(statusCb) {
 
 /* ================== Sync from Sheet ================== */
 async function syncFromSheet() {
-    if (!gasUrl()) { setConn('none', 'กรุณาใส่ URL ที่ลงท้ายด้วย /exec'); return; }
     setConn('loading');
     el.btnSync.disabled = true;
     try {
@@ -379,7 +369,6 @@ function handleImagePreview(fileInput, formId) {
 
 async function buildFaceDatabase() {
     el.buildError.textContent = '';
-    if (!gasUrl()) { alert('กรุณาใส่ Google Apps Script URL และกดบันทึกก่อน'); return; }
 
     const forms = [...document.querySelectorAll('[id^="emp-form-"]')].map(f => ({
         el: f,
@@ -566,7 +555,6 @@ async function recordAction(type) {
 }
 
 async function refreshLogs() {
-    if (!gasUrl()) return;
     el.btnRefreshLogs.disabled = true;
     try {
         const res = await apiGet('logs', { limit: 300 });

@@ -6,216 +6,60 @@
 <title>Wi-Fi QR Code</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="wifi.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<style>
-  :root {
-    --bg: #f4f6fa; --card: #ffffff; --text: #1d2433; --muted: #5d6679;
-    --border: #d9dee8; --accent: #1f6feb; --accent-text: #ffffff; --error: #c62828;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #12151c; --card: #1b2029; --text: #e6e9ef; --muted: #9aa3b5;
-      --border: #2e3542; --accent: #4c8dff; --accent-text: #0b0e14; --error: #ff8a80;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: 'Sarabun', system-ui, sans-serif; font-size: 17px; line-height: 1.5;
-  }
-  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .lead { color: var(--muted); margin: 0 0 24px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
-  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-  label { display: block; font-weight: 600; margin: 14px 0 6px; }
-  label:first-child { margin-top: 0; }
-  input[type=text], input[type=password], select {
-    width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-  }
-  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .pw-wrap { display: flex; gap: 8px; }
-  .pw-wrap input { flex: 1; }
-  .check { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-top: 14px; }
-  .hint { color: var(--muted); font-size: .9rem; margin-top: 4px; }
-  .err { color: var(--error); font-size: .9rem; min-height: 1.3em; margin-top: 8px; }
-  button {
-    font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
-    padding: 10px 16px; border: 1px solid var(--border); background: var(--bg); color: var(--text);
-  }
-  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
-  .preview { display: flex; flex-direction: column; align-items: center; }
-  #card { width: 100%; max-width: 360px; height: auto; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
-  .empty { color: var(--muted); text-align: center; padding: 60px 10px; }
-  .note { margin-top: 20px; color: var(--muted); font-size: .9rem; }
-  @media print {
-    body { background: #fff; }
-    main > *:not(.grid), .grid > .panel:first-child, .actions, .note { display: none !important; }
-    .grid { display: block; } .panel { border: none; padding: 0; }
-    #card { max-width: 90mm; border: none; }
-  }
-</style>
+<script src="wifi-qr.js"></script>
 </head>
 <body>
 <main>
-  <h1>สร้าง Wi-Fi QR Code</h1>
-  <p class="lead">สแกนด้วยกล้องโทรศัพท์แล้วเชื่อมต่อ Wi-Fi ได้ทันที ไม่ต้องพิมพ์ชื่อและรหัสผ่านเอง</p>
-
-  <div class="grid">
-    <section class="panel">
-      <label for="ssid">ชื่อ Wi-Fi (SSID)</label>
-      <input type="text" id="ssid" placeholder="เช่น SNR-WiFi" autocomplete="off">
-
-      <label for="security">ประเภทความปลอดภัย</label>
-      <select id="security">
-        <option value="WPA">WPA / WPA2 / WPA3 (ทั่วไป)</option>
-        <option value="WEP">WEP (รุ่นเก่า)</option>
-        <option value="nopass">ไม่มีรหัสผ่าน (Open)</option>
-      </select>
-
-      <div id="pwBlock">
-        <label for="password">รหัสผ่าน</label>
-        <div class="pw-wrap">
-          <input type="password" id="password" autocomplete="off">
-          <button type="button" id="togglePw">แสดง</button>
-        </div>
-      </div>
-
-      <label class="check"><input type="checkbox" id="hidden"> เครือข่ายซ่อนชื่อ (Hidden SSID)</label>
-      <label class="check"><input type="checkbox" id="showPw" checked> แสดงรหัสผ่านใต้ QR Code</label>
-
-      <label for="title">หัวข้อบนการ์ด (ไม่บังคับ)</label>
-      <input type="text" id="title" value="สแกนเพื่อเชื่อมต่อ Wi-Fi">
-
-      <div class="err" id="err"></div>
-      <div class="hint">ข้อมูลทั้งหมดประมวลผลในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ถูกส่งไปที่ใด</div>
-    </section>
-
-    <section class="panel preview">
-      <canvas id="card" width="720" height="900" hidden></canvas>
-      <div class="empty" id="empty">กรอกชื่อ Wi-Fi เพื่อสร้าง QR Code</div>
-      <div class="actions">
-        <button class="primary" id="download" disabled>ดาวน์โหลด PNG</button>
-        <button id="print" disabled>พิมพ์</button>
-      </div>
-    </section>
+  <div class="top no-print">
+    <div>
+      <h1>Wi-Fi QR Code</h1>
+      <p class="lead">เปิดกล้องโทรศัพท์สแกน QR Code แล้วกดเชื่อมต่อได้ทันที ไม่ต้องพิมพ์รหัสผ่าน</p>
+    </div>
+    <button id="printAll" hidden>พิมพ์</button>
   </div>
 
-  <p class="note">
-    รองรับกล้อง iPhone (iOS 11 ขึ้นไป) และ Android (10 ขึ้นไป หรือแอปสแกน QR / Google Lens)<br>
-    รูปแบบข้อมูลที่ใช้: <code>WIFI:T:WPA;S:ชื่อ;P:รหัสผ่าน;;</code>
-  </p>
+  <div id="status" class="empty">กำลังโหลด...</div>
+  <div id="cards" class="cards"></div>
+
+  <p class="foot no-print"><span id="allLink" hidden><a href="wifi.html">ดูทั้งหมด</a> · </span><a href="wifi-admin.html">สำหรับผู้ดูแล</a></p>
 </main>
 
 <script>
-(() => {
-  const $ = id => document.getElementById(id);
-  const ssid = $('ssid'), sec = $('security'), pw = $('password'), hidden = $('hidden'),
-        showPw = $('showPw'), title = $('title'), err = $('err'),
-        canvas = $('card'), empty = $('empty'), dl = $('download'), pr = $('print');
+(async () => {
+  const status = document.getElementById('status'), cards = document.getElementById('cards');
+  const onlyId = new URLSearchParams(location.search).get('id');
 
-  // Escape special characters per the Wi-Fi QR spec: \ ; , : "
-  const esc = s => s.replace(/([\\;,:"])/g, '\\$1');
+  if (!WifiQR.configured()) { status.textContent = 'ระบบยังไม่ได้ตั้งค่า URL ของ Apps Script'; return; }
 
-  function payload() {
-    const t = sec.value;
-    let s = `WIFI:T:${t};S:${esc(ssid.value)};`;
-    if (t !== 'nopass') s += `P:${esc(pw.value)};`;
-    if (hidden.checked) s += 'H:true;';
-    return s + ';';
-  }
+  try {
+    await WifiQR.fontsReady();
+    const res = await WifiQR.list();
+    if (!res.ok) throw new Error(res.message);
+    let list = res.networks;
+    if (onlyId) { list = list.filter(n => n.id === onlyId); document.getElementById('allLink').hidden = false; }
+    if (!list.length) { status.textContent = onlyId ? 'ไม่พบเครือข่ายนี้' : 'ยังไม่มีเครือข่าย Wi-Fi'; return; }
 
-  function validate() {
-    if (!ssid.value) return 'กรุณากรอกชื่อ Wi-Fi';
-    if (sec.value === 'WPA' && pw.value && (pw.value.length < 8 || pw.value.length > 63))
-      return 'รหัสผ่าน WPA ต้องมี 8–63 ตัวอักษร';
-    if (sec.value !== 'nopass' && !pw.value) return 'กรุณากรอกรหัสผ่าน';
-    return '';
-  }
-
-  function wrapText(ctx, text, maxW) {
-    // Break by characters so long SSIDs/passwords (and Thai text) still fit
-    const lines = []; let line = '';
-    for (const ch of text) {
-      if (ctx.measureText(line + ch).width > maxW && line) { lines.push(line); line = ch; }
-      else line += ch;
+    status.hidden = true;
+    document.getElementById('printAll').hidden = false;
+    for (const n of list) {
+      const card = document.createElement('div'); card.className = 'card';
+      const canvas = document.createElement('canvas');
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', `QR Code สำหรับเชื่อมต่อ Wi-Fi ${n.ssid}`);
+      WifiQR.drawCard(canvas, n);
+      const actions = document.createElement('div'); actions.className = 'actions no-print';
+      const dl = document.createElement('button'); dl.textContent = 'ดาวน์โหลด PNG';
+      dl.onclick = () => WifiQR.download(canvas, n.ssid);
+      actions.append(dl);
+      card.append(canvas, actions);
+      cards.append(card);
     }
-    if (line) lines.push(line);
-    return lines;
+  } catch (e) {
+    status.textContent = 'โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้าอีกครั้ง';
   }
-
-  function render() {
-    const e = validate();
-    err.textContent = ssid.value || pw.value ? e : '';
-    const ok = !e;
-    canvas.hidden = !ok; empty.hidden = ok; dl.disabled = !ok; pr.disabled = !ok;
-    if (!ok) return;
-
-    qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
-    const qr = qrcode(0, 'M');
-    qr.addData(payload(), 'Byte');
-    qr.make();
-
-    const W = 720, pad = 60, font = "'Sarabun', sans-serif";
-    const ctx = canvas.getContext('2d');
-    const n = qr.getModuleCount(), qrSize = W - pad * 2, cell = qrSize / (n + 8);
-
-    // Measure text first to size the canvas
-    ctx.font = `700 40px ${font}`;
-    const titleLines = title.value ? wrapText(ctx, title.value, W - pad * 2) : [];
-    ctx.font = `600 32px ${font}`;
-    const info = [['ชื่อ Wi-Fi', ssid.value]];
-    if (sec.value !== 'nopass' && showPw.checked) info.push(['รหัสผ่าน', pw.value]);
-    const infoLines = info.map(([k, v]) => [k, wrapText(ctx, v, W - pad * 2 - 200)]);
-    const infoH = infoLines.reduce((h, [, l]) => h + l.length * 44 + 8, 0);
-    const H = pad + titleLines.length * 52 + (titleLines.length ? 10 : 0) + qrSize + 20 + infoH + pad - 20;
-    canvas.height = Math.ceil(H);
-
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#111'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    let y = pad - 10;
-    ctx.font = `700 40px ${font}`;
-    for (const l of titleLines) { ctx.fillText(l, W / 2, y); y += 52; }
-    if (titleLines.length) y += 10;
-
-    // QR with 4-module quiet zone
-    const ox = pad + cell * 4, oy = y + cell * 4;
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
-      if (qr.isDark(r, c)) ctx.fillRect(Math.floor(ox + c * cell), Math.floor(oy + r * cell), Math.ceil(cell), Math.ceil(cell));
-    y += qrSize + 20;
-
-    ctx.textAlign = 'left';
-    for (const [k, lines] of infoLines) {
-      ctx.font = `400 30px ${font}`; ctx.fillStyle = '#555';
-      ctx.fillText(k, pad, y + 2);
-      ctx.font = `600 32px ${font}`; ctx.fillStyle = '#111';
-      for (const l of lines) { ctx.fillText(l, pad + 200, y); y += 44; }
-      y += 8;
-    }
-  }
-
-  $('togglePw').onclick = () => {
-    const show = pw.type === 'password';
-    pw.type = show ? 'text' : 'password';
-    $('togglePw').textContent = show ? 'ซ่อน' : 'แสดง';
-  };
-  sec.onchange = () => { $('pwBlock').hidden = showPw.parentElement.hidden = sec.value === 'nopass'; render(); };
-  [ssid, pw, title].forEach(el => el.addEventListener('input', render));
-  [hidden, showPw].forEach(el => el.addEventListener('change', render));
-
-  dl.onclick = () => {
-    const a = document.createElement('a');
-    a.download = `wifi-${ssid.value.replace(/[^\w฀-๿-]+/g, '_')}.png`;
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-  };
-  pr.onclick = () => window.print();
-
-  document.fonts.ready.then(render);
+  document.getElementById('printAll').onclick = () => window.print();
 })();
 </script>
 </body>

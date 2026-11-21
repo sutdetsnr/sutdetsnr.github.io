@@ -1,13 +1,5 @@
 [
   {
-    "id": "meetinghall",
-    "ssid": "Meeting_hall",
-    "security": "WPA",
-    "password": "snr@hall",
-    "hidden": false,
-    "title": "สแกนเพื่อเชื่อมต่อ Wi-Fi"
-  },
-  {
     "id": "2bux14a5",
     "ssid": "Meeting_Hall",
     "security": "WPA",

@@ -1,6 +1,6 @@
-// ===== ตั้งค่า: วาง URL ของ Web App (Apps Script) ที่ได้จากการ Deploy ไว้ตรงนี้ =====
-const WIFI_API_URL = '';
-// ==============================================================================
+// ===== ตั้งค่า: repo ที่เก็บไฟล์ข้อมูล Wi-Fi =====
+const WIFI_REPO = { owner: 'sutdetsnr', repo: 'sutdetsnr.github.io', branch: 'main', path: 'wifi.json' };
+// ================================================
 
 const WifiQR = (() => {
   // Escape special characters per the Wi-Fi QR spec: \ ; , : "
@@ -83,27 +83,63 @@ const WifiQR = (() => {
     return '';
   }
 
-  // ---- API ----
+  // ---- data ----
+  // Public: read the published wifi.json (query string skips the Pages CDN cache)
   async function list() {
-    const res = await fetch(`${WIFI_API_URL}?action=list`);
+    const res = await fetch(`${WIFI_REPO.path}?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.status === 404) return [];
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return res.json();
   }
 
-  // text/plain avoids a CORS preflight, which Apps Script cannot answer
-  async function post(body) {
-    const res = await fetch(WIFI_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body)
-    });
+  // Admin: read and write wifi.json through the GitHub API with the admin's token
+  const api = `https://api.github.com/repos/${WIFI_REPO.owner}/${WIFI_REPO.repo}`;
+  const gh = (token, url, opts = {}) => fetch(url, {
+    ...opts,
+    cache: 'no-store',
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`,
+               'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) }
+  });
+
+  const b64encode = str => { let bin = ''; for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b); return btoa(bin); };
+  const b64decode = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), c => c.charCodeAt(0)));
+
+  // Returns '' if the token may write to the repo, otherwise a Thai error message
+  async function checkToken(token) {
+    const res = await gh(token, api);
+    if (res.status === 401) return 'Token ไม่ถูกต้องหรือหมดอายุ';
+    if (!res.ok) return 'Token นี้เข้าถึง repo ไม่ได้';
+    const repo = await res.json();
+    if (!repo.permissions || !repo.permissions.push) return 'Token นี้ไม่มีสิทธิ์แก้ไข repo';
+    return '';
+  }
+
+  async function readRepo(token) {
+    const res = await gh(token, `${api}/contents/${WIFI_REPO.path}?ref=${WIFI_REPO.branch}`);
+    if (res.status === 404) return { networks: [], sha: null };
+    if (res.status === 401) throw Object.assign(new Error('auth'), { auth: true });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
+    const f = await res.json();
+    return { networks: JSON.parse(b64decode(f.content)), sha: f.sha };
+  }
+
+  async function writeRepo(token, networks, sha, message) {
+    const res = await gh(token, `${api}/contents/${WIFI_REPO.path}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message, branch: WIFI_REPO.branch, ...(sha ? { sha } : {}),
+        content: b64encode(JSON.stringify(networks, null, 2) + '\n')
+      })
+    });
+    if (res.status === 401) throw Object.assign(new Error('auth'), { auth: true });
+    if (res.status === 409 || res.status === 422) throw Object.assign(new Error('conflict'), { conflict: true });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return (await res.json()).content.sha;
   }
 
   // Canvas text needs the web font loaded first
   const fontsReady = () => Promise.all(['400 30px Sarabun', '600 32px Sarabun', '700 40px Sarabun']
     .map(f => document.fonts.load(f, 'กขWiFi'))).catch(() => {});
 
-  return { fontsReady, payload, drawCard, download, validate, list, post, configured: () => !!WIFI_API_URL };
+  return { fontsReady, payload, drawCard, download, validate, list, checkToken, readRepo, writeRepo };
 })();

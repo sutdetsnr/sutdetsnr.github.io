@@ -29,10 +29,11 @@
   <!-- Login -->
   <section id="loginView" class="panel login" hidden>
     <h1>เข้าสู่ระบบผู้ดูแล</h1>
-    <p class="hint">สำหรับตั้งค่า Wi-Fi QR Code</p>
+    <p class="hint">ใช้ GitHub Token ที่มีสิทธิ์แก้ไข repo นี้ (<a href="wifi-admin-help.html" target="_blank">วิธีสร้าง Token</a>)</p>
     <form id="loginForm">
-      <label for="adminPw">รหัสผ่านผู้ดูแล</label>
-      <input type="password" id="adminPw" autocomplete="current-password" required>
+      <label for="adminPw">GitHub Token</label>
+      <input type="password" id="adminPw" autocomplete="current-password" placeholder="github_pat_..." required>
+      <label class="check"><input type="checkbox" id="remember"> จำการเข้าสู่ระบบบนเครื่องนี้</label>
       <div class="err" id="loginErr" role="alert"></div>
       <button class="primary" id="loginBtn" type="submit">เข้าสู่ระบบ</button>
     </form>
@@ -43,7 +44,7 @@
     <div class="top">
       <div>
         <h1>ตั้งค่า Wi-Fi QR Code</h1>
-        <p class="lead">เพิ่ม แก้ไข หรือลบเครือข่าย ทุกคนจะเห็น QR Code ที่หน้า <a href="wifi.html" target="_blank">wifi.html</a></p>
+        <p class="lead">เพิ่ม แก้ไข หรือลบเครือข่าย ทุกคนจะเห็น QR Code ที่หน้า <a href="wifi.html" target="_blank">wifi.html</a> (หลังบันทึกรอประมาณ 1 นาที)</p>
       </div>
       <button id="logout">ออกจากระบบ</button>
     </div>
@@ -92,7 +93,6 @@
     </section>
   </div>
 
-  <div id="notConfigured" class="panel empty" hidden>ยังไม่ได้ใส่ URL ของ Apps Script ในไฟล์ wifi-qr.js</div>
 </main>
 
 <script>
@@ -100,15 +100,14 @@
   const $ = id => document.getElementById(id);
   const TOKEN_KEY = 'wifiAdminToken';
   const store = {
-    get() { try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; } },
-    set(v) { try { sessionStorage.setItem(TOKEN_KEY, v); } catch {} },
-    clear() { try { sessionStorage.removeItem(TOKEN_KEY); } catch {} }
+    get() { try { return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY); } catch { return null; } },
+    set(v, remember) { try { (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, v); } catch {} },
+    clear() { try { sessionStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_KEY); } catch {} }
   };
   let token = store.get();
   let networks = [];
+  let sha = null;          // version of wifi.json we last read; GitHub rejects stale writes
   let editingId = null;
-
-  if (!WifiQR.configured()) { $('notConfigured').hidden = false; return; }
 
   function showLogin(msg) {
     token = null; store.clear();
@@ -125,9 +124,10 @@
     e.preventDefault();
     const btn = $('loginBtn'); btn.disabled = true; $('loginErr').textContent = '';
     try {
-      const res = await WifiQR.post({ action: 'login', password: $('adminPw').value });
-      if (!res.ok) { $('loginErr').textContent = res.message; return; }
-      token = res.token; store.set(token);
+      const t = $('adminPw').value.trim();
+      const err = await WifiQR.checkToken(t);
+      if (err) { $('loginErr').textContent = err; return; }
+      token = t; store.set(token, $('remember').checked);
       $('adminPw').value = '';
       showAdmin(); loadList();
     } catch {
@@ -135,19 +135,32 @@
     } finally { btn.disabled = false; }
   };
 
-  $('logout').onclick = () => {
-    WifiQR.post({ action: 'logout', token }).catch(() => {});
-    showLogin();
-  };
+  $('logout').onclick = () => showLogin();
 
   // ---------- list ----------
   async function loadList() {
     try {
-      const res = await WifiQR.list();
-      if (!res.ok) throw new Error();
-      networks = res.networks; renderList();
-    } catch {
+      ({ networks, sha } = await WifiQR.readRepo(token));
+      renderList();
+    } catch (e) {
+      if (e.auth) return showLogin('หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่');
       $('list').innerHTML = '<div class="empty">โหลดข้อมูลไม่สำเร็จ</div>';
+    }
+  }
+
+  // Apply a change to the latest wifi.json and commit it; retries once if someone else saved meanwhile
+  async function commit(change, message) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const next = change(networks.slice());
+        sha = await WifiQR.writeRepo(token, next, sha, message);
+        networks = next; renderList();
+        return true;
+      } catch (e) {
+        if (e.auth) { showLogin('หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่'); return false; }
+        if (e.conflict && attempt === 0) { ({ networks, sha } = await WifiQR.readRepo(token)); continue; }
+        throw e;
+      }
     }
   }
 
@@ -231,10 +244,15 @@
     if (err) { $('formErr').textContent = err; return; }
     const btn = $('saveBtn'); btn.disabled = true; $('formErr').textContent = 'กำลังบันทึก...';
     try {
-      const res = await WifiQR.post({ action: 'save', token, network: n });
-      if (res.auth === false) return showLogin(res.message);
-      if (!res.ok) { $('formErr').textContent = res.message; return; }
-      networks = res.networks; renderList(); resetForm();
+      const isNew = !n.id;
+      if (isNew) n.id = Math.random().toString(36).slice(2, 10);
+      const saved = await commit(list => {
+        const i = list.findIndex(x => x.id === n.id);
+        if (i >= 0) list[i] = n; else list.push(n);
+        return list;
+      }, `Wi-Fi: ${isNew ? 'add' : 'update'} ${n.ssid}`);
+      if (!saved) return;
+      resetForm();
       $('formErr').className = 'err msg-ok'; $('formErr').textContent = 'บันทึกเรียบร้อย';
     } catch {
       $('formErr').textContent = 'บันทึกไม่สำเร็จ กรุณาลองใหม่';
@@ -245,11 +263,8 @@
     if (!confirm(`ลบเครือข่าย "${n.ssid}" ?`)) return;
     btn.disabled = true;
     try {
-      const res = await WifiQR.post({ action: 'delete', token, id: n.id });
-      if (res.auth === false) return showLogin(res.message);
-      if (!res.ok) { alert(res.message); return; }
-      networks = res.networks; renderList();
-      if (editingId === n.id) resetForm();
+      const ok = await commit(list => list.filter(x => x.id !== n.id), `Wi-Fi: remove ${n.ssid}`);
+      if (ok && editingId === n.id) resetForm();
     } catch {
       alert('ลบไม่สำเร็จ กรุณาลองใหม่');
     } finally { btn.disabled = false; }

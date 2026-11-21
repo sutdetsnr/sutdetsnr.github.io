@@ -31,13 +31,9 @@
   const status = document.getElementById('status'), cards = document.getElementById('cards');
   const onlyId = new URLSearchParams(location.search).get('id');
 
-  if (!WifiQR.configured()) { status.textContent = 'ระบบยังไม่ได้ตั้งค่า URL ของ Apps Script'; return; }
-
   try {
     await WifiQR.fontsReady();
-    const res = await WifiQR.list();
-    if (!res.ok) throw new Error(res.message);
-    let list = res.networks;
+    let list = await WifiQR.list();
     if (onlyId) { list = list.filter(n => n.id === onlyId); document.getElementById('allLink').hidden = false; }
     if (!list.length) { status.textContent = onlyId ? 'ไม่พบเครือข่ายนี้' : 'ยังไม่มีเครือข่าย Wi-Fi'; return; }
 

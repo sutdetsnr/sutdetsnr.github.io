@@ -1,0 +1,10 @@
+[
+  {
+    "id": "meetinghall",
+    "ssid": "Meeting_hall",
+    "security": "WPA",
+    "password": "snr@hall",
+    "hidden": false,
+    "title": "สแกนเพื่อเชื่อมต่อ Wi-Fi"
+  }
+]

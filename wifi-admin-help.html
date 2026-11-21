@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>วิธีสร้าง GitHub Token</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="wifi.css">
+<style>
+  main { max-width: 720px; }
+  ol li { margin-bottom: 10px; }
+  code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+  .panel + .panel { margin-top: 20px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>วิธีสร้าง GitHub Token สำหรับผู้ดูแล</h1>
+  <p class="lead">ทำครั้งเดียว ใช้ Token นี้ login ที่หน้า <a href="wifi-admin.html">ตั้งค่า Wi-Fi QR Code</a></p>
+
+  <section class="panel">
+    <ol>
+      <li>เข้าสู่ระบบ GitHub ด้วยบัญชีที่เป็นเจ้าของหรือมีสิทธิ์แก้ไข repo <code>sutdetsnr.github.io</code></li>
+      <li>เปิด <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+      <li><b>Token name</b>: ตั้งชื่อ เช่น <code>wifi-admin</code></li>
+      <li><b>Expiration</b>: เลือกวันหมดอายุ (เช่น 1 ปี) เมื่อหมดอายุให้สร้างใหม่</li>
+      <li><b>Repository access</b>: เลือก <b>Only select repositories</b> แล้วเลือก <code>sutdetsnr.github.io</code> เท่านั้น</li>
+      <li><b>Permissions</b> &gt; <b>Repository permissions</b> &gt; <b>Contents</b>: เลือก <b>Read and write</b> (ไม่ต้องเปิดสิทธิ์อื่น)</li>
+      <li>กด <b>Generate token</b> แล้วคัดลอก Token ที่ขึ้นต้นด้วย <code>github_pat_</code> เก็บไว้ในที่ปลอดภัย</li>
+      <li>นำ Token ไปวางในหน้า login ของผู้ดูแล</li>
+    </ol>
+  </section>
+
+  <section class="panel">
+    <h2>ข้อควรรู้</h2>
+    <ul>
+      <li>Token ใช้แทนรหัสผ่านผู้ดูแล ห้ามส่งให้คนอื่นหรือโพสต์ไว้ในที่สาธารณะ</li>
+      <li>ถ้าเลือก "จำการเข้าสู่ระบบบนเครื่องนี้" Token จะถูกเก็บในเบราว์เซอร์ ใช้เฉพาะเครื่องส่วนตัว และกด "ออกจากระบบ" ทุกครั้งเมื่อใช้เครื่องสาธารณะ</li>
+      <li>ถ้าสงสัยว่า Token หลุด ให้ลบทิ้งที่ <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener">GitHub Settings</a> แล้วสร้างใหม่</li>
+      <li>หลังบันทึก หน้า <code>wifi.html</code> จะอัปเดตภายในประมาณ 1 นาที (GitHub Pages ต้องสร้างเว็บใหม่)</li>
+      <li>รหัส Wi-Fi อยู่ใน QR Code และในไฟล์ <code>wifi.json</code> ที่เปิดดูได้แบบสาธารณะ ระบบ login มีไว้กันคนอื่นแก้ไข ไม่ได้ซ่อนรหัส Wi-Fi</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

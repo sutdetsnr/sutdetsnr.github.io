@@ -6,5 +6,13 @@
     "password": "snr@hall",
     "hidden": false,
     "title": "สแกนเพื่อเชื่อมต่อ Wi-Fi"
+  },
+  {
+    "id": "lpd8459b",
+    "ssid": "Meeting_hall",
+    "security": "WPA",
+    "password": "snr@hall",
+    "hidden": false,
+    "title": "สแกนเพื่อเชื่อมต่อ Wi-Fi"
   }
 ]
